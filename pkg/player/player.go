@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -31,6 +30,8 @@ var (
 	playerJumpTimer                                                          int
 	playerFrameAttack                                                        int
 	frameCountAttack                                                         int
+	attackActive                                                             bool
+	baseFacing                                                               Direction
 
 	frameCount int
 
@@ -85,7 +86,6 @@ func PlayerInput() {
 	}
 
 	if rl.IsKeyDown(rl.KeyA) || rl.IsKeyDown(rl.KeyLeft) {
-
 		if !playerMoveTool {
 			playerMoving = true
 			playerLeft = true
@@ -123,42 +123,73 @@ func PlayerMoving() {
 	oldX, oldY = PlayerDest.X, PlayerDest.Y
 	playerSrc.X = playerSrc.Width * float32(playerFrame)
 
-	if playerAttack {
-		if playerDir == DirUp {
+	if playerAttack && !attackActive {
+		attackActive = true
+		playerFrameAttack = 0
+		frameCountAttack = 0
+
+		switch playerDir {
+		case DirUp:
 			playerDir = DirAttackUp
-		}
-
-		if playerDir == DirDown {
+			baseFacing = DirUp
+		case DirDown:
 			playerDir = DirAttackDown
-		}
-
-		if playerDir == DirLeft {
+			baseFacing = DirDown
+		case DirLeft:
 			playerDir = DirAttackLeft
-		}
-
-		if playerDir == DirRight {
+			baseFacing = DirLeft
+		case DirRight:
 			playerDir = DirAttackRight
+			baseFacing = DirRight
+		case DirAttackUp:
+			baseFacing = DirUp
+		case DirAttackDown:
+			baseFacing = DirDown
+		case DirAttackLeft:
+			baseFacing = DirLeft
+		case DirAttackRight:
+			baseFacing = DirRight
+		default:
+			playerDir = DirAttackDown
+			baseFacing = DirDown
 		}
+		playerAttack = false
+	}
 
+	if attackActive {
+		frameCountAttack++
 		if frameCountAttack%4 == 0 {
 			playerFrameAttack++
-
-			fmt.Println("attack frame", playerFrameAttack)
 		}
+		if playerFrameAttack >= 5 {
+			attackActive = false
+			playerFrameAttack = 0
 
+			switch baseFacing {
+			case DirUp:
+				playerDir = DirUp
+			case DirDown:
+				playerDir = DirDown
+			case DirLeft:
+				playerDir = DirLeft
+			case DirRight:
+				playerDir = DirRight
+			default:
+				playerDir = DirDown
+			}
+		}
 	}
-
-	if playerFrameAttack > 4 {
-		playerFrameAttack = 0
-	}
-
-	frameCountAttack++
 
 	if playerMoving {
 		if playerUp {
-			playerDir = DirUp
+			if !attackActive {
+				playerDir = DirUp
+				baseFacing = DirUp
+			}
 			PlayerDest.Y -= playerSpeed
-			playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			if !attackActive {
+				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			}
 
 			if playerSpeed == 2 {
 				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
@@ -170,18 +201,28 @@ func PlayerMoving() {
 			}
 		}
 		if playerDown {
-			playerDir = DirDown
+			if !attackActive {
+				playerDir = DirDown
+				baseFacing = DirDown
+			}
 			PlayerDest.Y += playerSpeed
-			playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			if !attackActive {
+				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			}
 
 			if playerSpeed == 2 {
 				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
 			}
 		}
 		if playerLeft {
-			playerDir = DirLeft
+			if !attackActive {
+				playerDir = DirLeft
+				baseFacing = DirLeft
+			}
 			PlayerDest.X -= playerSpeed
-			playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			if !attackActive {
+				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			}
 
 			if playerSpeed == 2 {
 				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
@@ -189,9 +230,14 @@ func PlayerMoving() {
 		}
 
 		if playerRight {
-			playerDir = DirRight
+			if !attackActive {
+				playerDir = DirRight
+				baseFacing = DirRight
+			}
 			PlayerDest.X += playerSpeed
-			playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			if !attackActive {
+				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
+			}
 
 			if playerSpeed == 2 {
 				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
@@ -199,11 +245,13 @@ func PlayerMoving() {
 		}
 
 		if frameCount%8 == 1 {
-			playerFrame++
+			if !attackActive {
+				playerFrame++
+			}
 		}
 
-		/*PlayerOpenHouseDoor()
-		PlayerOpenBarnDoor() */
+		PlayerOpenHouseDoor()
+
 	} else if frameCount%45 == 1 {
 		playerFrame++
 	}
@@ -219,20 +267,26 @@ func PlayerMoving() {
 		playerFrame = 0
 	}
 
-	if !playerAttack && playerFrameAttack > 4 {
-		playerFrameAttack = 0
-	}
-
 	playerSrc.Y = playerSrc.Height * float32(playerDir)
+
+	if attackActive {
+		playerSrc.X = playerSrc.Width * float32(playerFrameAttack)
+	}
 
 	PlayerHitBox.X = PlayerDest.X + (PlayerDest.Width / 2) - PlayerHitBox.Width/2
 	PlayerHitBox.Y = PlayerDest.Y + (PlayerDest.Height / 2) + playerHitBoxYOffset
 
 	PlayerCollision(world.Out)
+	PlayerCollision(world.Fence)
+	PlayerCollision(world.Buildings)
+	PlayerCollision(world.Trees)
+	PlayerCollision(world.Bushes)
+	PlayerCollision(world.Markets)
+	PlayerCollisionLamps()
 
 	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
 
-	playerMoving, playerJumping, playerAttack = false, false, false
+	playerMoving, playerJumping = false, false
 	playerUp, playerDown, playerLeft, playerRight = false, false, false, false
 }
 
@@ -248,6 +302,36 @@ func PlayerCollision(tiles []world.Tile) {
 			PlayerDest.X = oldX
 			PlayerDest.Y = oldY
 		}
+	}
+}
+
+func PlayerCollisionLamps() {
+	const lampBaseW, lampBaseH = 16, 16
+
+	for i := 0; i < len(world.Lamps); i++ {
+		lamp := world.Lamps[i]
+		lampRectX := float32(lamp.X)
+		lampRectY := float32(lamp.Y)
+
+		if PlayerHitBox.X < lampRectX+float32(lampBaseW) &&
+			PlayerHitBox.X+PlayerHitBox.Width > lampRectX &&
+			PlayerHitBox.Y < lampRectY+float32(lampBaseH) &&
+			PlayerHitBox.Y+PlayerHitBox.Height > lampRectY {
+			PlayerDest.X = oldX
+			PlayerDest.Y = oldY
+		}
+	}
+}
+
+func PlayerOpenHouseDoor() {
+	world.HouseDoorSrc.X = 80
+
+	if PlayerHitBox.X < float32(world.HouseDoorDest.X+world.HouseDoorDest.Width) &&
+		PlayerHitBox.X+PlayerHitBox.Width > float32(world.HouseDoorDest.X) &&
+		PlayerHitBox.Y < float32(world.HouseDoorDest.Y+world.HouseDoorDest.Height) &&
+		PlayerHitBox.Y+PlayerHitBox.Height > float32(world.HouseDoorDest.Y) {
+
+		world.OpenHouseDoor()
 	}
 }
 

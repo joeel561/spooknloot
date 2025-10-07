@@ -24,15 +24,13 @@ var (
 
 func drawScene() {
 	world.DrawWorld()
+	world.DrawDoors()
+	world.DrawBottomLamp()
 	player.DrawPlayerTexture()
-	/*
+	world.DrawWheat()
+	world.DrawPumpkinLamp()
+	world.DrawTopLamp()
 
-		items.DrawItems()
-
-		world.DrawDoors()
-
-
-	*/
 	if printDebug {
 		debug.DrawPlayerOutlines()
 	}
@@ -45,8 +43,11 @@ func init() {
 	player.InitPlayer()
 
 	world.InitWorld()
+	world.InitDoors()
+	world.InitLamps()
+	world.InitPumpkinLamps()
 
-	world.LoadMap("pkg/world/world.json")
+	world.LoadMap("pkg/world/map.json")
 
 	/*
 		world.InitDoors()
@@ -93,6 +94,8 @@ func input() {
 func update() {
 	running = !rl.WindowShouldClose()
 
+	world.LightLamps()
+	world.LightPumpkinLamps()
 	player.PlayerMoving()
 	/*
 		player.PlayerUseTools()
@@ -128,6 +131,8 @@ func render() {
 func quit() {
 	player.UnloadPlayerTexture()
 	world.UnloadWorldTexture()
+	world.UnloadDoorsTextures()
+	world.UnloadPumpkinLamps()
 	/*
 		userinterface.UnloadUserInterface() */
 	//	rl.UnloadMusicStream(music)

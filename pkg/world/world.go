@@ -112,7 +112,7 @@ func DrawWorld() {
 			Bushes = WorldMap.Layers[i].Tiles
 		}
 
-		if WorldMap.Layers[i].Name == "markets" {
+		if WorldMap.Layers[i].Name == "market" {
 			Markets = WorldMap.Layers[i].Tiles
 		}
 	}
@@ -123,14 +123,17 @@ func DrawWorld() {
 	RenderLayer(Background)
 	RenderLayer(Ground)
 	RenderLayer(Plants)
-	RenderLayer(Wheat)
+	RenderLayer(Street)
 	RenderLayer(Bushes)
 	RenderLayer(Trees)
 	RenderLayer(Fence)
 	RenderLayer(Markets)
-	RenderLayer(Street)
 	RenderLayer(Spider)
 	RenderLayer(Buildings)
+}
+
+func DrawWheat() {
+	RenderLayer(Wheat)
 }
 
 func RenderLayer(Layer []Tile) {
