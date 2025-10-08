@@ -1,8 +1,10 @@
 # Spook’n’Loot
 
-2D Pixel-Art Rougke Like Game. Du spawnst zuerst in einer Halloween Stadt und kannst dort Easer Eggs entdecken. Um das richtige Spiel zu starten musst du durch das mysteriös Gebäude. Dich erwarten 20 Level die du schaffen musst bis du zum Endboss kommst. Stirbst du faengt das Spiel komplett von vorne an. Release 31. Oct ** Spiel befindet sich im Aufbau ** Der ganze Prozess wird auf meinem Twitch Kanal gestreamt http://twitch.tv/joeel561/
+2D Pixel-Art Rougke Like Game. Du spawnst zuerst in einer Halloween Stadt und kannst dort Easer Eggs entdecken. Um das richtige Spiel zu starten musst du durch das mysteriös Gebäude. Dich erwarten 20 Level die du schaffen musst bis du zum Endboss kommst. Stirbst du faengt das Spiel komplett von vorne an. Release 31. Oct **Spiel befindet sich im Aufbau** Der ganze Prozess wird auf meinem Twitch Kanal gestreamt http://twitch.tv/joeel561/
 
 ---
+
+![til](./assets/preview1.gif)
 
 ## 📦 Projektstruktur
 
@@ -18,6 +20,8 @@
 ```
 
 ---
+
+![til](./assets/preview2.gif)
 
 ## 🚀 Installation & Ausführung
 
