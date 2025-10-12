@@ -2,6 +2,7 @@ package main
 
 import (
 	"spooknloot/pkg/debug"
+	"spooknloot/pkg/mobs"
 	"spooknloot/pkg/player"
 	"spooknloot/pkg/world"
 
@@ -24,12 +25,16 @@ var (
 
 func drawScene() {
 	world.DrawWorld()
-	world.DrawDoors()
 	world.DrawBottomLamp()
+	world.DrawDoors()
+
 	player.DrawPlayerTexture()
+	mobs.DrawGhosts()
+
 	world.DrawWheat()
 	world.DrawPumpkinLamp()
 	world.DrawTopLamp()
+	world.DrawCauldron()
 
 	if printDebug {
 		debug.DrawPlayerOutlines()
@@ -41,6 +46,7 @@ func init() {
 	rl.SetExitKey(0)
 	rl.SetTargetFPS(60)
 	player.InitPlayer()
+	mobs.InitGhost()
 
 	world.InitWorld()
 	world.InitDoors()
@@ -97,6 +103,10 @@ func update() {
 	world.LightLamps()
 	world.LightPumpkinLamps()
 	player.PlayerMoving()
+
+	playerPos := rl.NewVector2(player.PlayerDest.X, player.PlayerDest.Y)
+	mobs.GhostMoving(playerPos)
+	mobs.UpdateGhostSpawning()
 	/*
 		player.PlayerUseTools()
 		items.UpdateItems() */
@@ -133,6 +143,7 @@ func quit() {
 	world.UnloadWorldTexture()
 	world.UnloadDoorsTextures()
 	world.UnloadPumpkinLamps()
+	mobs.UnloadGhostTexture()
 	/*
 		userinterface.UnloadUserInterface() */
 	//	rl.UnloadMusicStream(music)

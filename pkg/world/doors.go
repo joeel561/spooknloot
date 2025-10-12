@@ -14,9 +14,9 @@ var (
 )
 
 func InitDoors() {
-	doorsSprite = rl.LoadTexture("assets/world/dooranimationsprites.png")
-	HouseDoorSrc = rl.NewRectangle(80, 0, 16, 16)
-	HouseDoorDest = rl.NewRectangle(512, 190, 16, 16)
+	doorsSprite = rl.LoadTexture("assets/world/door.png")
+	HouseDoorSrc = rl.NewRectangle(0, 0, 32, 32)
+	HouseDoorDest = rl.NewRectangle(504, 175, 32, 32)
 }
 
 func OpenHouseDoor() {
@@ -27,9 +27,9 @@ func OpenHouseDoor() {
 		frameDoor++
 	}
 
-	HouseDoorSrc.X = 16
-
 	frameDoor = frameDoor % DoorsMaxFrame
+
+	HouseDoorSrc.X = float32(frameDoor * 32)
 }
 
 func DrawDoors() {

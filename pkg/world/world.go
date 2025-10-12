@@ -27,6 +27,7 @@ var (
 	Wheat          []Tile
 	Bushes         []Tile
 	Markets        []Tile
+	Spawn          []Tile
 )
 
 type JsonMap struct {
@@ -76,6 +77,10 @@ func DrawWorld() {
 			Background = WorldMap.Layers[i].Tiles
 		}
 
+		if WorldMap.Layers[i].Name == "spawn" {
+			Spawn = WorldMap.Layers[i].Tiles
+		}
+
 		if WorldMap.Layers[i].Name == "ground" {
 			Ground = WorldMap.Layers[i].Tiles
 		}
@@ -120,6 +125,7 @@ func DrawWorld() {
 	rl.DrawTexturePro(tex, tileSrc, tileDest, rl.NewVector2(0, 0), 0, rl.White)
 
 	RenderLayer(Out)
+	RenderLayer(Spawn)
 	RenderLayer(Background)
 	RenderLayer(Ground)
 	RenderLayer(Plants)

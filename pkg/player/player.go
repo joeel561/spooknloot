@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -324,12 +325,14 @@ func PlayerCollisionLamps() {
 }
 
 func PlayerOpenHouseDoor() {
-	world.HouseDoorSrc.X = 80
+	world.HouseDoorSrc.X = 0
 
 	if PlayerHitBox.X < float32(world.HouseDoorDest.X+world.HouseDoorDest.Width) &&
 		PlayerHitBox.X+PlayerHitBox.Width > float32(world.HouseDoorDest.X) &&
 		PlayerHitBox.Y < float32(world.HouseDoorDest.Y+world.HouseDoorDest.Height) &&
 		PlayerHitBox.Y+PlayerHitBox.Height > float32(world.HouseDoorDest.Y) {
+
+		fmt.Println("Open Door")
 
 		world.OpenHouseDoor()
 	}
