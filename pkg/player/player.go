@@ -18,7 +18,7 @@ var (
 
 	playerSrc                                                                rl.Rectangle
 	PlayerDest                                                               rl.Rectangle
-	playerMoving                                                             bool
+	PlayerMove                                                               bool
 	playerDir                                                                Direction
 	playerUp, playerDown, playerLeft, playerRight, playerAttack, playerBlock bool
 	playerFrame                                                              int
@@ -33,6 +33,7 @@ var (
 	frameCountAttack                                                         int
 	attackActive                                                             bool
 	baseFacing                                                               Direction
+	PlayerRadius                                                             rl.Rectangle
 
 	frameCount int
 
@@ -74,28 +75,28 @@ func PlayerInput() {
 	/* 	activeItem := userinterface.PlayerActiveItem */
 	if rl.IsKeyDown(rl.KeyW) || rl.IsKeyDown(rl.KeyUp) {
 		if !playerMoveTool {
-			playerMoving = true
+			PlayerMove = true
 			playerUp = true
 		}
 	}
 
 	if rl.IsKeyDown(rl.KeyS) || rl.IsKeyDown(rl.KeyDown) {
 		if !playerMoveTool {
-			playerMoving = true
+			PlayerMove = true
 			playerDown = true
 		}
 	}
 
 	if rl.IsKeyDown(rl.KeyA) || rl.IsKeyDown(rl.KeyLeft) {
 		if !playerMoveTool {
-			playerMoving = true
+			PlayerMove = true
 			playerLeft = true
 		}
 	}
 
 	if rl.IsKeyDown(rl.KeyD) || rl.IsKeyDown(rl.KeyRight) {
 		if !playerMoveTool {
-			playerMoving = true
+			PlayerMove = true
 			playerRight = true
 		}
 	}
@@ -181,7 +182,7 @@ func PlayerMoving() {
 		}
 	}
 
-	if playerMoving {
+	if PlayerMove {
 		if playerUp {
 			if !attackActive {
 				playerDir = DirUp
@@ -264,7 +265,7 @@ func PlayerMoving() {
 
 	playerSrc.Y = playerSrc.Height * float32(playerDir)
 
-	if !playerMoving && playerFrame > 4 {
+	if !PlayerMove && playerFrame > 4 {
 		playerFrame = 0
 	}
 
@@ -276,6 +277,10 @@ func PlayerMoving() {
 
 	PlayerHitBox.X = PlayerDest.X + (PlayerDest.Width / 2) - PlayerHitBox.Width/2
 	PlayerHitBox.Y = PlayerDest.Y + (PlayerDest.Height / 2) + playerHitBoxYOffset
+	PlayerRadius.X = PlayerDest.X + (PlayerDest.Width / 2) - (PlayerRadius.Width / 2)
+	PlayerRadius.Y = PlayerDest.Y + (PlayerDest.Height / 2) - (PlayerRadius.Height / 2)
+	PlayerRadius.Width = PlayerDest.Width + 200
+	PlayerRadius.Height = PlayerDest.Height + 200
 
 	PlayerCollision(world.Out)
 	PlayerCollision(world.Fence)
@@ -287,7 +292,7 @@ func PlayerMoving() {
 
 	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
 
-	playerMoving, playerJumping = false, false
+	PlayerMove, playerJumping = false, false
 	playerUp, playerDown, playerLeft, playerRight = false, false, false, false
 }
 

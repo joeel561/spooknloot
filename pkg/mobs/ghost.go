@@ -2,9 +2,7 @@ package mobs
 
 import (
 	"fmt"
-	"math/rand"
 	"spooknloot/pkg/world"
-	"time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -25,56 +23,61 @@ var (
 func InitGhost() {
 	ghostSprite = rl.LoadTexture("assets/mobs/ghost-spritesheet.png")
 
-	rand.Seed(time.Now().UnixNano())
+	//rand.Seed(time.Now().UnixNano())
 
-	SpawnGhost()
+	//SpawnGhost()
+
+	fmt.Println("ghosts spawned:", len(ghosts))
 }
 
 func SpawnGhost() {
-	spawnTiles := world.Spawn
+	/* 	spawnTiles := world.Spawn
 
-	if len(spawnTiles) == 0 {
-		return
+	   	if len(spawnTiles) == 0 {
+	   		return
+	   	} */
+
+	/* 	maxAttempts := 10
+	   	for attempt := 0; attempt < maxAttempts; attempt++ { */
+	/* 		randomIndex := rand.Intn(len(spawnTiles))
+	   		//selectedTile := spawnTiles[randomIndex]
+
+
+	   		x := float32(selectedTile.X * world.WorldMap.TileSize)
+	   		y := float32(selectedTile.Y * world.WorldMap.TileSize)
+	*/
+
+	newGhost := Mob{
+		Sprite:       ghostSprite,
+		Src:          rl.NewRectangle(0, 0, 16, 30),
+		Dest:         rl.NewRectangle(518, 526, 16, 30),
+		Dir:          5,
+		Frame:        0,
+		HitBox:       rl.NewRectangle(0, 0, 10, 10),
+		FrameCount:   0,
+		LastAttack:   0,
+		IsAttacking:  false,
+		AttackTimer:  0,
+		MaxHealth:    5.0,
+		Health:       5.0,
+		HealthbarDir: 0,
+		IsDead:       false,
+		DeathTimer:   0,
 	}
 
-	maxAttempts := 10
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		randomIndex := rand.Intn(len(spawnTiles))
-		selectedTile := spawnTiles[randomIndex]
-
-		x := float32(selectedTile.X * world.WorldMap.TileSize)
-		y := float32(selectedTile.Y * world.WorldMap.TileSize)
-
-		newGhost := Mob{
-			Sprite:       ghostSprite,
-			Src:          rl.NewRectangle(0, 0, 16, 30),
-			Dest:         rl.NewRectangle(x, y, 16, 30),
-			Dir:          5,
-			Frame:        0,
-			HitBox:       rl.NewRectangle(0, 0, 10, 10),
-			FrameCount:   0,
-			LastAttack:   0,
-			IsAttacking:  false,
-			AttackTimer:  0,
-			MaxHealth:    5.0,
-			Health:       5.0,
-			HealthbarDir: 0,
-			IsDead:       false,
-			DeathTimer:   0,
-		}
-
-		ghosts = append(ghosts, newGhost)
-		return
-	}
+	ghosts = append(ghosts, newGhost)
+	//return
 }
 
-func UpdateGhostSpawning() {
+/* } */
+
+/* func UpdateGhostSpawning() {
 	spawnTimer++
 	if spawnTimer >= spawnInterval {
 		SpawnGhost()
 		spawnTimer = 0
 	}
-}
+} */
 
 func DrawGhosts() {
 	for i := range ghosts {

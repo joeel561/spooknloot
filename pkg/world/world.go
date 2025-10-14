@@ -38,8 +38,9 @@ type JsonMap struct {
 }
 
 type Layer struct {
-	Name  string `json:"name"`
-	Tiles []Tile `json:"tiles"`
+	Name     string `json:"name"`
+	Tiles    []Tile `json:"tiles"`
+	Collider bool   `json:"collider"`
 }
 
 type Tile struct {
@@ -66,6 +67,7 @@ func InitWorld() {
 	SpritesheetMap = rl.LoadTexture("assets/world/spritesheet.png")
 	tileDest = rl.NewRectangle(0, 0, 16, 16)
 	tileSrc = rl.NewRectangle(0, 0, 16, 16)
+
 }
 
 func DrawWorld() {

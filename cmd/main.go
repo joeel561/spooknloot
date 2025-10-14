@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"spooknloot/pkg/debug"
 	"spooknloot/pkg/mobs"
 	"spooknloot/pkg/player"
@@ -30,6 +31,7 @@ func drawScene() {
 
 	player.DrawPlayerTexture()
 	mobs.DrawGhosts()
+	mobs.DrawMobs()
 
 	world.DrawWheat()
 	world.DrawPumpkinLamp()
@@ -46,14 +48,18 @@ func init() {
 	rl.SetExitKey(0)
 	rl.SetTargetFPS(60)
 	player.InitPlayer()
-	mobs.InitGhost()
 
 	world.InitWorld()
 	world.InitDoors()
 	world.InitLamps()
 	world.InitPumpkinLamps()
 
+	fmt.Println("Map loaded")
+
 	world.LoadMap("pkg/world/map.json")
+
+	mobs.InitGhost()
+	mobs.InitMobs()
 
 	/*
 		world.InitDoors()
@@ -105,8 +111,9 @@ func update() {
 	player.PlayerMoving()
 
 	playerPos := rl.NewVector2(player.PlayerDest.X, player.PlayerDest.Y)
-	mobs.GhostMoving(playerPos)
-	mobs.UpdateGhostSpawning()
+	//mobs.GhostMoving(playerPos)
+	mobs.MobMoving(playerPos)
+	//mobs.UpdateGhostSpawning()
 	/*
 		player.PlayerUseTools()
 		items.UpdateItems() */

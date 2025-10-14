@@ -39,6 +39,7 @@ func DebugText() []string {
 		fmt.Sprintf("Player Src %v", rectToString(playerSrc)),
 		fmt.Sprintf("Player Dest %v", rectToString(player.PlayerDest)),
 		fmt.Sprintf("Player Hitbox %v", rectToString(player.PlayerHitBox)),
+		fmt.Sprintf("Player Radius %v", rectToString(player.PlayerRadius)),
 	}
 }
 
@@ -68,4 +69,6 @@ func DrawPlayerOutlines() {
 	// Draw collision rectangle
 	rl.DrawRectangleLinesEx(player.PlayerHitBox, 1, rl.Green)
 	rl.DrawRectangleLinesEx(player.PlayerDest, 1, rl.Purple)
+	rl.DrawRectangleLinesEx(player.PlayerRadius, 1, rl.Blue)
+	rl.DrawRectangle(int32(player.PlayerRadius.X), int32(player.PlayerRadius.Y), int32(player.PlayerRadius.Width), int32(player.PlayerRadius.Height), rl.NewColor(0, 0, 255, 50))
 }
