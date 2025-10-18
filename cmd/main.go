@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"spooknloot/pkg/debug"
 	"spooknloot/pkg/mobs"
 	"spooknloot/pkg/player"
@@ -54,29 +53,12 @@ func init() {
 	world.InitLamps()
 	world.InitPumpkinLamps()
 
-	fmt.Println("Map loaded")
-
 	world.LoadMap("pkg/world/map.json")
 
 	mobs.InitGhost()
 	mobs.InitMobs()
 
-	/*
-		world.InitDoors()
-		items.InitItems() */
-	/* 	player.InitPlayer()
-
-	   	userinterface.InitUserInterface() */
-
-	/* 	rl.InitAudioDevice()
-	   	music = rl.LoadMusicStream("assets/bgmusic.mp3") */
-
-	/* 	musicPaused = false
-	   	rl.PlayMusicStream(music) */
-
 	printDebug = false
-
-	//userinterface.LoadUserInterfaceMap("pkg/userinterface/userinterface.json")
 }
 
 func input() {
@@ -90,17 +72,9 @@ func input() {
 		printDebug = !printDebug
 	}
 
-	/*
-		if rl.IsKeyPressed(rl.KeyQ) {
-			musicPaused = !musicPaused
-		} */
-
 	if rl.IsKeyPressed(rl.KeyEscape) {
 		running = false
 	}
-
-	/* 	userinterface.ItemBarInput() */
-
 }
 
 func update() {
@@ -108,9 +82,17 @@ func update() {
 
 	world.LightLamps()
 	world.LightPumpkinLamps()
+
+	if player.IsPlayerDead() {
+		player.ResetPlayer()
+		//mobs.ResetMobs()
+		return
+	}
+
 	player.PlayerMoving()
 
 	playerPos := rl.NewVector2(player.PlayerDest.X, player.PlayerDest.Y)
+
 	//mobs.GhostMoving(playerPos)
 	mobs.MobMoving(playerPos)
 	//mobs.UpdateGhostSpawning()
@@ -135,6 +117,8 @@ func render() {
 
 	drawScene()
 	rl.EndMode2D()
+
+	player.DrawHealthBar()
 
 	if printDebug {
 		debug.DrawDebug(debug.DebugText())

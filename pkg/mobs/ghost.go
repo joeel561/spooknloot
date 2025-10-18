@@ -21,7 +21,7 @@ var (
 )
 
 func InitGhost() {
-	ghostSprite = rl.LoadTexture("assets/mobs/ghost-spritesheet.png")
+	ghostSprite = rl.LoadTexture("assets/mobs/bad-spritesheet.png")
 
 	//rand.Seed(time.Now().UnixNano())
 

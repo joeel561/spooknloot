@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -39,6 +38,23 @@ var (
 
 	playerSpeed float32 = 1.4
 
+	healthBarTexture rl.Texture2D
+	maxHealth        float32 = 10.0
+	currentHealth    float32 = 10.0
+	healthbarDir     int     = 0
+	healthBarSrc     rl.Rectangle
+
+	lastAttackTime int
+	attackCooldown int     = 30
+	attackRange    float32 = 40
+	isAttacking    bool
+	attackDuration int = 15
+	attackTimer    int
+	attackPressed  bool
+
+	healthRegenTimer    int = 0
+	healthRegenInterval int = 120
+
 	Cam rl.Camera2D
 )
 
@@ -53,10 +69,23 @@ const (
 	DirAttackLeft
 	DirAttackRight
 	DirAttackUp
+	DirJumpDown
+	DirJumpLeft
+	DirJumpRight
+	DirJumpUp
+	DirDamageDown
+	DirDamageLeft
+	DirDamageRight
+	DirDamageUp
 )
 
 func InitPlayer() {
 	playerSprite = rl.LoadTexture("assets/char/char-sprites.png")
+
+	healthBarTexture = rl.LoadTexture("assets/char/healthbar.png")
+	rl.SetTextureFilter(healthBarTexture, rl.FilterPoint)
+
+	healthBarSrc = rl.NewRectangle(0, 0, 64, 16)
 
 	playerSrc = rl.NewRectangle(0, 0, 48, 48)
 
@@ -115,10 +144,24 @@ func PlayerInput() {
 	if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 		playerAttack = true
 	}
-	/* 	if activeItem.Name == "Hoe" && rl.IsMouseButtonPressed(rl.MouseLeftButton) {
-		playerHoe = true
-		playerMoveTool = true
-	} */
+}
+
+func TryAttack(targetPos rl.Vector2, attackFunc func(float32)) bool {
+	if attackPressed && frameCount-lastAttackTime >= attackCooldown && !attackActive {
+		playerPos := rl.NewVector2(PlayerDest.X, PlayerDest.Y)
+		dist := rl.Vector2Distance(playerPos, targetPos)
+
+		if dist <= attackRange {
+			attackFunc(1.2)
+			lastAttackTime = frameCount
+			attackActive = true
+			attackTimer = attackDuration
+			attackPressed = false
+			return true
+		}
+	}
+	attackPressed = false
+	return false
 }
 
 func PlayerMoving() {
@@ -130,31 +173,8 @@ func PlayerMoving() {
 		playerFrameAttack = 0
 		frameCountAttack = 0
 
-		switch playerDir {
-		case DirUp:
-			playerDir = DirAttackUp
-			baseFacing = DirUp
-		case DirDown:
-			playerDir = DirAttackDown
-			baseFacing = DirDown
-		case DirLeft:
-			playerDir = DirAttackLeft
-			baseFacing = DirLeft
-		case DirRight:
-			playerDir = DirAttackRight
-			baseFacing = DirRight
-		case DirAttackUp:
-			baseFacing = DirUp
-		case DirAttackDown:
-			baseFacing = DirDown
-		case DirAttackLeft:
-			baseFacing = DirLeft
-		case DirAttackRight:
-			baseFacing = DirRight
-		default:
-			playerDir = DirAttackDown
-			baseFacing = DirDown
-		}
+		playerDirections()
+
 		playerAttack = false
 	}
 
@@ -181,6 +201,8 @@ func PlayerMoving() {
 			}
 		}
 	}
+
+	RegenerateHealth()
 
 	if PlayerMove {
 		if playerUp {
@@ -336,13 +358,153 @@ func PlayerOpenHouseDoor() {
 		PlayerHitBox.X+PlayerHitBox.Width > float32(world.HouseDoorDest.X) &&
 		PlayerHitBox.Y < float32(world.HouseDoorDest.Y+world.HouseDoorDest.Height) &&
 		PlayerHitBox.Y+PlayerHitBox.Height > float32(world.HouseDoorDest.Y) {
-
-		fmt.Println("Open Door")
-
 		world.OpenHouseDoor()
+	}
+}
+
+func RegenerateHealth() {
+	healthRegenTimer++
+
+	if healthRegenTimer >= healthRegenInterval {
+		if currentHealth < maxHealth {
+			currentHealth += 1.0
+			if currentHealth > maxHealth {
+				currentHealth = maxHealth
+			}
+
+			UpdateHealthBar()
+		}
+		healthRegenTimer = 0
+	}
+}
+
+func UpdateHealthBar() {
+	healthPercentage := currentHealth / maxHealth
+	if healthPercentage > 0.8 {
+		healthbarDir = 0
+	} else if healthPercentage > 0.6 {
+		healthbarDir = 1
+	} else if healthPercentage > 0.4 {
+		healthbarDir = 2
+	} else if healthPercentage > 0.2 {
+		healthbarDir = 3
+	} else {
+		healthbarDir = 4
+	}
+}
+
+func SetPlayerDamageState() {
+	playerDir = DirDamageDown
+}
+
+func TakeDamage(damage float32) {
+	currentHealth -= damage
+	if currentHealth < 0 {
+		currentHealth = 0
+	}
+
+	UpdateHealthBar()
+}
+
+func DrawHealthBar() {
+	healthBarSrc.Y = healthBarSrc.Height * float32(healthbarDir)
+
+	margin := float32(16)
+	barW, barH := float32(64)*2, float32(16)*2
+
+	healthBarX := margin
+	healthBarY := barH + margin
+
+	healthBarDest := rl.NewRectangle(healthBarX, healthBarY, barW, barH)
+
+	rl.DrawTexturePro(healthBarTexture, healthBarSrc, healthBarDest, rl.NewVector2(0, 0), 0, rl.White)
+}
+
+func GetCurrentHealth() float32 {
+	return currentHealth
+}
+
+func GetMaxHealth() float32 {
+	return maxHealth
+}
+
+func IsPlayerDead() bool {
+	return currentHealth <= 0
+}
+
+func ResetPlayer() {
+	currentHealth = maxHealth
+	PlayerDest.X = 495
+	PlayerDest.Y = 344
+	playerDir = 1
+	playerFrame = 0
+	PlayerMove = false
+	playerUp, playerDown, playerLeft, playerRight = false, false, false, false
+	isAttacking = false
+	attackTimer = 0
+	attackPressed = false
+	frameCount = 0
+	lastAttackTime = 0
+	healthRegenTimer = 0
+
+	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
+
+	UpdateHealthBar()
+}
+
+func playerDirections() {
+	switch playerDir {
+	case DirUp:
+		playerDir = DirAttackUp
+		baseFacing = DirUp
+	case DirDown:
+		playerDir = DirAttackDown
+		baseFacing = DirDown
+	case DirLeft:
+		playerDir = DirAttackLeft
+		baseFacing = DirLeft
+	case DirRight:
+		playerDir = DirAttackRight
+		baseFacing = DirRight
+	case DirAttackUp:
+		baseFacing = DirUp
+	case DirAttackDown:
+		baseFacing = DirDown
+	case DirAttackLeft:
+		baseFacing = DirLeft
+	case DirAttackRight:
+		baseFacing = DirRight
+	case DirJumpUp:
+		playerDir = DirJumpUp
+		baseFacing = DirUp
+	case DirJumpDown:
+		playerDir = DirJumpDown
+		baseFacing = DirDown
+	case DirJumpLeft:
+		playerDir = DirJumpLeft
+		baseFacing = DirLeft
+	case DirJumpRight:
+		playerDir = DirJumpRight
+		baseFacing = DirRight
+	case DirDamageUp:
+		playerDir = DirDamageUp
+		baseFacing = DirUp
+	case DirDamageDown:
+		playerDir = DirDamageDown
+		baseFacing = DirDown
+	case DirDamageLeft:
+		playerDir = DirDamageLeft
+		baseFacing = DirLeft
+	case DirDamageRight:
+		playerDir = DirDamageRight
+		baseFacing = DirRight
+	default:
+		playerDir = DirAttackDown
+		baseFacing = DirDown
 	}
 }
 
 func UnloadPlayerTexture() {
 	rl.UnloadTexture(playerSprite)
+	rl.UnloadTexture(healthBarTexture)
 }
