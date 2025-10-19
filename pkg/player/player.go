@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -29,6 +30,7 @@ var (
 	playerJumping                                                            bool
 	playerJumpTimer                                                          int
 	playerFrameAttack                                                        int
+	playerFrameDead                                                          int
 	frameCountAttack                                                         int
 	attackActive                                                             bool
 	baseFacing                                                               Direction
@@ -39,6 +41,7 @@ var (
 	playerSpeed float32 = 1.4
 
 	healthBarTexture rl.Texture2D
+	healthBarScale   float32 = 4
 	maxHealth        float32 = 10.0
 	currentHealth    float32 = 10.0
 	healthbarDir     int     = 0
@@ -56,15 +59,22 @@ var (
 	healthRegenInterval int = 120
 
 	Cam rl.Camera2D
+
+	// Death animation state
+	deathAnimationComplete bool
 )
 
 type Direction int
 
 const (
-	DirDown = Direction(iota)
-	DirLeft
-	DirRight
-	DirUp
+	DirIdleDown = Direction(iota)
+	DirIdleLeft
+	DirIdleRight
+	DirIdleUp
+	DirMoveDown
+	DirMoveLeft
+	DirMoveRight
+	DirMoveUp
 	DirAttackDown
 	DirAttackLeft
 	DirAttackRight
@@ -77,10 +87,18 @@ const (
 	DirDamageLeft
 	DirDamageRight
 	DirDamageUp
+	DirDeadDown
+	DirDeadLeft
+	DirDeadRight
+	DirDeadUp
+	DirDashDown
+	DirDashLeft
+	DirDashRight
+	DirDashUp
 )
 
 func InitPlayer() {
-	playerSprite = rl.LoadTexture("assets/char/char-sprites.png")
+	playerSprite = rl.LoadTexture("assets/char/char-sheet.png")
 
 	healthBarTexture = rl.LoadTexture("assets/char/healthbar.png")
 	rl.SetTextureFilter(healthBarTexture, rl.FilterPoint)
@@ -101,6 +119,10 @@ func DrawPlayerTexture() {
 }
 
 func PlayerInput() {
+	// Block input while dead so the player can't move/attack during death animation
+	if IsPlayerDead() {
+		return
+	}
 	/* 	activeItem := userinterface.PlayerActiveItem */
 	if rl.IsKeyDown(rl.KeyW) || rl.IsKeyDown(rl.KeyUp) {
 		if !playerMoveTool {
@@ -188,16 +210,16 @@ func PlayerMoving() {
 			playerFrameAttack = 0
 
 			switch baseFacing {
-			case DirUp:
-				playerDir = DirUp
-			case DirDown:
-				playerDir = DirDown
-			case DirLeft:
-				playerDir = DirLeft
-			case DirRight:
-				playerDir = DirRight
+			case DirMoveDown:
+				playerDir = DirMoveDown
+			case DirMoveUp:
+				playerDir = DirMoveUp
+			case DirMoveLeft:
+				playerDir = DirMoveLeft
+			case DirMoveRight:
+				playerDir = DirMoveRight
 			default:
-				playerDir = DirDown
+				playerDir = DirIdleDown
 			}
 		}
 	}
@@ -207,70 +229,72 @@ func PlayerMoving() {
 	if PlayerMove {
 		if playerUp {
 			if !attackActive {
-				playerDir = DirUp
-				baseFacing = DirUp
+				playerDir = DirMoveUp
+				baseFacing = DirMoveUp
 			}
 			PlayerDest.Y -= playerSpeed
-			if !attackActive {
-				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
-			}
 
 			if playerSpeed == 2 {
-				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
+				playerDir = DirDashUp
 			}
 
-			if playerJumping {
-				PlayerDest.Y -= playerSpeed / 2
-				PlayerDest.X += playerSpeed / 2
+			if IsPlayerDead() {
+				playerDir = DirDeadUp
 			}
 		}
 		if playerDown {
 			if !attackActive {
-				playerDir = DirDown
-				baseFacing = DirDown
+				playerDir = DirMoveDown
+				baseFacing = DirMoveDown
 			}
 			PlayerDest.Y += playerSpeed
-			if !attackActive {
-				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
-			}
 
 			if playerSpeed == 2 {
-				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
+				playerDir = DirDashDown
+			}
+
+			if IsPlayerDead() {
+				playerDir = DirDeadDown
 			}
 		}
 		if playerLeft {
 			if !attackActive {
-				playerDir = DirLeft
-				baseFacing = DirLeft
+				playerDir = DirMoveLeft
+				baseFacing = DirMoveLeft
 			}
 			PlayerDest.X -= playerSpeed
-			if !attackActive {
-				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
-			}
 
 			if playerSpeed == 2 {
-				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
+				playerDir = DirDashLeft
+			}
+
+			if IsPlayerDead() {
+				playerDir = DirDeadLeft
 			}
 		}
 
 		if playerRight {
 			if !attackActive {
-				playerDir = DirRight
-				baseFacing = DirRight
+				playerDir = DirMoveRight
+				baseFacing = DirMoveRight
 			}
 			PlayerDest.X += playerSpeed
-			if !attackActive {
-				playerSrc.X = float32(144) + playerSrc.Width*float32(playerFrame)
-			}
 
 			if playerSpeed == 2 {
-				playerSrc.X = float32(336) + playerSrc.Width*float32(playerFrame)
+				playerDir = DirDashRight
+			}
+
+			if IsPlayerDead() {
+				playerDir = DirDeadRight
 			}
 		}
 
 		if frameCount%8 == 1 {
 			if !attackActive {
 				playerFrame++
+			}
+			if IsPlayerDead() {
+				playerFrameDead++
 			}
 		}
 
@@ -281,13 +305,41 @@ func PlayerMoving() {
 	}
 
 	frameCount++
+
+	// Handle death animation progression independent of movement input
+	if IsPlayerDead() {
+		// Lock direction to a dead variant based on last facing
+		switch baseFacing {
+		case DirMoveUp:
+			playerDir = DirDeadUp
+		case DirMoveLeft:
+			playerDir = DirDeadLeft
+		case DirMoveRight:
+			playerDir = DirDeadRight
+		default:
+			playerDir = DirDeadDown
+		}
+
+		if !deathAnimationComplete {
+			if frameCount%8 == 1 {
+				playerFrameDead++
+			}
+			// Assuming 8-frame death strip: indices 0..7
+			if playerFrameDead >= 7 {
+				playerFrameDead = 7
+				deathAnimationComplete = true
+			}
+		}
+	}
 	if playerFrame >= 4 {
 		playerFrame = 0
 	}
 
-	playerSrc.Y = playerSrc.Height * float32(playerDir)
+	if playerSpeed == 2 && playerFrame >= 3 {
+		playerFrame = 0
+	}
 
-	if !PlayerMove && playerFrame > 4 {
+	if !PlayerMove && playerFrame > 3 {
 		playerFrame = 0
 	}
 
@@ -295,6 +347,10 @@ func PlayerMoving() {
 
 	if attackActive {
 		playerSrc.X = playerSrc.Width * float32(playerFrameAttack)
+	}
+
+	if IsPlayerDead() {
+		playerSrc.X = playerSrc.Width * float32(playerFrameDead)
 	}
 
 	PlayerHitBox.X = PlayerDest.X + (PlayerDest.Width / 2) - PlayerHitBox.Width/2
@@ -363,6 +419,10 @@ func PlayerOpenHouseDoor() {
 }
 
 func RegenerateHealth() {
+	// Do not regenerate while dead
+	if IsPlayerDead() {
+		return
+	}
 	healthRegenTimer++
 
 	if healthRegenTimer >= healthRegenInterval {
@@ -394,7 +454,13 @@ func UpdateHealthBar() {
 }
 
 func SetPlayerDamageState() {
-	playerDir = DirDamageDown
+	playerDir = Direction(DirDamageDown)
+
+	if playerFrame >= 2 {
+		playerFrame = 0
+	}
+
+	fmt.Println(playerFrame)
 }
 
 func TakeDamage(damage float32) {
@@ -409,15 +475,24 @@ func TakeDamage(damage float32) {
 func DrawHealthBar() {
 	healthBarSrc.Y = healthBarSrc.Height * float32(healthbarDir)
 
-	margin := float32(16)
-	barW, barH := float32(64)*2, float32(16)*2
+	margin := float32(10)
+	barW, barH := float32(64)*healthBarScale, float32(16)*healthBarScale
 
 	healthBarX := margin
-	healthBarY := barH + margin
+	healthBarY := margin
 
 	healthBarDest := rl.NewRectangle(healthBarX, healthBarY, barW, barH)
 
 	rl.DrawTexturePro(healthBarTexture, healthBarSrc, healthBarDest, rl.NewVector2(0, 0), 0, rl.White)
+}
+
+// SetHealthBarScale allows changing the on-screen scale of the health bar.
+// Example: SetHealthBarScale(6) to make it 6x the source size.
+func SetHealthBarScale(scale float32) {
+	if scale < 1 {
+		scale = 1
+	}
+	healthBarScale = scale
 }
 
 func GetCurrentHealth() float32 {
@@ -432,12 +507,18 @@ func IsPlayerDead() bool {
 	return currentHealth <= 0
 }
 
+// HasPlayerDeathAnimationFinished indicates if the death animation reached its last frame
+func HasPlayerDeathAnimationFinished() bool {
+	return deathAnimationComplete
+}
+
 func ResetPlayer() {
 	currentHealth = maxHealth
 	PlayerDest.X = 495
 	PlayerDest.Y = 344
 	playerDir = 1
 	playerFrame = 0
+	playerFrameDead = 0
 	PlayerMove = false
 	playerUp, playerDown, playerLeft, playerRight = false, false, false, false
 	isAttacking = false
@@ -446,6 +527,7 @@ func ResetPlayer() {
 	frameCount = 0
 	lastAttackTime = 0
 	healthRegenTimer = 0
+	deathAnimationComplete = false
 
 	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
 
@@ -454,53 +536,29 @@ func ResetPlayer() {
 
 func playerDirections() {
 	switch playerDir {
-	case DirUp:
+	case DirMoveUp:
 		playerDir = DirAttackUp
-		baseFacing = DirUp
-	case DirDown:
+		baseFacing = DirMoveUp
+	case DirMoveDown:
 		playerDir = DirAttackDown
-		baseFacing = DirDown
-	case DirLeft:
+		baseFacing = DirMoveDown
+	case DirMoveLeft:
 		playerDir = DirAttackLeft
-		baseFacing = DirLeft
-	case DirRight:
+		baseFacing = DirMoveLeft
+	case DirMoveRight:
 		playerDir = DirAttackRight
-		baseFacing = DirRight
+		baseFacing = DirMoveRight
 	case DirAttackUp:
-		baseFacing = DirUp
+		baseFacing = DirMoveUp
 	case DirAttackDown:
-		baseFacing = DirDown
+		baseFacing = DirMoveDown
 	case DirAttackLeft:
-		baseFacing = DirLeft
+		baseFacing = DirMoveLeft
 	case DirAttackRight:
-		baseFacing = DirRight
-	case DirJumpUp:
-		playerDir = DirJumpUp
-		baseFacing = DirUp
-	case DirJumpDown:
-		playerDir = DirJumpDown
-		baseFacing = DirDown
-	case DirJumpLeft:
-		playerDir = DirJumpLeft
-		baseFacing = DirLeft
-	case DirJumpRight:
-		playerDir = DirJumpRight
-		baseFacing = DirRight
-	case DirDamageUp:
-		playerDir = DirDamageUp
-		baseFacing = DirUp
-	case DirDamageDown:
-		playerDir = DirDamageDown
-		baseFacing = DirDown
-	case DirDamageLeft:
-		playerDir = DirDamageLeft
-		baseFacing = DirLeft
-	case DirDamageRight:
-		playerDir = DirDamageRight
-		baseFacing = DirRight
+		baseFacing = DirMoveRight
 	default:
 		playerDir = DirAttackDown
-		baseFacing = DirDown
+		baseFacing = DirMoveDown
 	}
 }
 

@@ -84,17 +84,33 @@ func update() {
 	world.LightPumpkinLamps()
 
 	if player.IsPlayerDead() {
-		player.ResetPlayer()
-		//mobs.ResetMobs()
+		// Keep updating to progress the death animation
+		player.PlayerMoving()
+		if player.HasPlayerDeathAnimationFinished() {
+			player.ResetPlayer()
+			mobs.ResetMobs()
+		}
 		return
 	}
 
 	player.PlayerMoving()
 
-	playerPos := rl.NewVector2(player.PlayerDest.X, player.PlayerDest.Y)
+	playerPos := rl.NewVector2(player.PlayerHitBox.X, player.PlayerHitBox.Y)
+	attackPlayerFunc := func() {
+		player.SetPlayerDamageState()
+		player.TakeDamage(0.5)
+	}
+	mobs.MobMoving(playerPos, attackPlayerFunc)
 
-	//mobs.GhostMoving(playerPos)
-	mobs.MobMoving(playerPos)
+	if mobs.IsMobAlive() {
+		closestMobIndex := mobs.GetClosestMobIndex(playerPos)
+		if closestMobIndex != -1 {
+			mobPos := mobs.GetMobPositionByIndex(closestMobIndex)
+			player.TryAttack(mobPos, func(damage float32) {
+				mobs.DamageMob(closestMobIndex, damage)
+			})
+		}
+	}
 	//mobs.UpdateGhostSpawning()
 	/*
 		player.PlayerUseTools()
