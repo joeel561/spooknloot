@@ -62,6 +62,10 @@ var (
 
 	// Death animation state
 	deathAnimationComplete bool
+
+	// External collision handling (e.g., dungeon)
+	useExternalColliders bool
+	externalColliders    []rl.Rectangle
 )
 
 type Direction int
@@ -381,13 +385,17 @@ func PlayerMoving() {
 	PlayerRadius.Width = PlayerDest.Width + 200
 	PlayerRadius.Height = PlayerDest.Height + 200
 
-	PlayerCollision(world.Out)
-	PlayerCollision(world.Fence)
-	PlayerCollision(world.Buildings)
-	PlayerCollision(world.Trees)
-	PlayerCollision(world.Bushes)
-	PlayerCollision(world.Markets)
-	PlayerCollisionLamps()
+	if useExternalColliders {
+		PlayerCollisionRects(externalColliders)
+	} else {
+		PlayerCollision(world.Out)
+		PlayerCollision(world.Fence)
+		PlayerCollision(world.Buildings)
+		PlayerCollision(world.Trees)
+		PlayerCollision(world.Bushes)
+		PlayerCollision(world.Markets)
+		PlayerCollisionLamps()
+	}
 
 	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
 
@@ -422,6 +430,19 @@ func PlayerCollisionLamps() {
 			PlayerHitBox.X+PlayerHitBox.Width > lampRectX &&
 			PlayerHitBox.Y < lampRectY+float32(lampBaseH) &&
 			PlayerHitBox.Y+PlayerHitBox.Height > lampRectY {
+			PlayerDest.X = oldX
+			PlayerDest.Y = oldY
+		}
+	}
+}
+
+func PlayerCollisionRects(rects []rl.Rectangle) {
+	for i := 0; i < len(rects); i++ {
+		if PlayerHitBox.X < rects[i].X+rects[i].Width &&
+			PlayerHitBox.X+PlayerHitBox.Width > rects[i].X &&
+			PlayerHitBox.Y < rects[i].Y+rects[i].Height &&
+			PlayerHitBox.Y+PlayerHitBox.Height > rects[i].Y {
+
 			PlayerDest.X = oldX
 			PlayerDest.Y = oldY
 		}
@@ -576,4 +597,20 @@ func playerDirections() {
 func UnloadPlayerTexture() {
 	rl.UnloadTexture(playerSprite)
 	rl.UnloadTexture(healthBarTexture)
+}
+
+func SetExternalColliders(rects []rl.Rectangle) {
+	externalColliders = rects
+	useExternalColliders = true
+}
+
+func ClearExternalColliders() {
+	externalColliders = nil
+	useExternalColliders = false
+}
+
+func SetPosition(x, y float32) {
+	PlayerDest.X = x
+	PlayerDest.Y = y
+	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
 }

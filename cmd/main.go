@@ -2,6 +2,7 @@ package main
 
 import (
 	"spooknloot/pkg/debug"
+	"spooknloot/pkg/dungeon"
 	"spooknloot/pkg/mobs"
 	"spooknloot/pkg/player"
 	"spooknloot/pkg/world"
@@ -21,21 +22,27 @@ var (
 	musicPaused bool
 	music       rl.Music
 	printDebug  bool
+
+	// game mode
+	inDungeon     bool
+	savedWorldPos rl.Vector2
 )
 
 func drawScene() {
-	world.DrawWorld()
-	world.DrawBottomLamp()
-	world.DrawDoors()
-	mobs.DrawMobs()
+	if inDungeon {
+		dungeon.Draw()
+	} else {
+		world.DrawWorld()
+		world.DrawBottomLamp()
+		world.DrawDoors()
+		mobs.DrawMobs()
+		world.DrawWheat()
+		world.DrawPumpkinLamp()
+		world.DrawTopLamp()
+		world.DrawCauldron()
+	}
 
 	player.DrawPlayerTexture()
-	mobs.SpawnMobs(5, "bat")
-
-	world.DrawWheat()
-	world.DrawPumpkinLamp()
-	world.DrawTopLamp()
-	world.DrawCauldron()
 
 	if printDebug {
 		debug.DrawPlayerOutlines()
@@ -57,6 +64,8 @@ func init() {
 	player.InitPlayer()
 	mobs.InitMobs()
 
+	dungeon.Init()
+
 	printDebug = false
 }
 
@@ -74,13 +83,20 @@ func input() {
 	if rl.IsKeyPressed(rl.KeyEscape) {
 		running = false
 	}
+
+	// temporary dev toggle to exit dungeon
+	if inDungeon && rl.IsKeyPressed(rl.KeyBackspace) {
+		exitDungeon()
+	}
 }
 
 func update() {
 	running = !rl.WindowShouldClose()
 
-	world.LightLamps()
-	world.LightPumpkinLamps()
+	if !inDungeon {
+		world.LightLamps()
+		world.LightPumpkinLamps()
+	}
 
 	if player.IsPlayerDead() {
 		// Keep updating to progress the death animation
@@ -99,9 +115,11 @@ func update() {
 		player.SetPlayerDamageState()
 		player.TakeDamage(0.5)
 	}
-	mobs.MobMoving(playerPos, attackPlayerFunc)
+	if !inDungeon {
+		mobs.MobMoving(playerPos, attackPlayerFunc)
+	}
 
-	if mobs.IsMobAlive() {
+	if !inDungeon && mobs.IsMobAlive() {
 		closestMobIndex := mobs.GetClosestMobIndex(playerPos)
 		if closestMobIndex != -1 {
 			// Use mob hitbox center for reliable melee range checks
@@ -109,6 +127,15 @@ func update() {
 			player.TryAttack(mobCenter, func(damage float32) {
 				mobs.DamageMob(closestMobIndex, damage)
 			})
+		}
+	}
+
+	if !inDungeon {
+		checkEnterDungeon()
+	} else {
+		// exit when hitting dungeon exit tile
+		if dungeon.IsPlayerAtExit(player.PlayerHitBox) {
+			exitDungeon()
 		}
 	}
 }
@@ -138,6 +165,7 @@ func quit() {
 	world.UnloadDoorsTextures()
 	world.UnloadPumpkinLamps()
 	mobs.UnloadMobsTexture()
+	dungeon.Unload()
 
 	rl.CloseWindow()
 }
@@ -150,4 +178,36 @@ func main() {
 	}
 
 	quit()
+}
+
+func checkEnterDungeon() {
+	// enter when overlapping the house door
+	if player.PlayerHitBox.X < float32(world.HouseDoorDest.X+world.HouseDoorDest.Width) &&
+		player.PlayerHitBox.X+player.PlayerHitBox.Width > float32(world.HouseDoorDest.X) &&
+		player.PlayerHitBox.Y < float32(world.HouseDoorDest.Y+world.HouseDoorDest.Height) &&
+		player.PlayerHitBox.Y+player.PlayerHitBox.Height > float32(world.HouseDoorDest.Y) {
+		enterDungeon()
+	}
+}
+
+func enterDungeon() {
+	if inDungeon {
+		return
+	}
+	inDungeon = true
+	savedWorldPos = rl.NewVector2(player.PlayerDest.X, player.PlayerDest.Y)
+
+	dungeon.Generate()
+	player.SetExternalColliders(dungeon.GetColliders())
+	spawn := dungeon.GetSpawnPosition()
+	player.SetPosition(spawn.X, spawn.Y)
+}
+
+func exitDungeon() {
+	if !inDungeon {
+		return
+	}
+	inDungeon = false
+	player.ClearExternalColliders()
+	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
 }
