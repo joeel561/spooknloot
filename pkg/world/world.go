@@ -138,6 +138,7 @@ func DrawWorld() {
 	RenderLayer(Markets)
 	RenderLayer(Spider)
 	RenderLayer(Buildings)
+
 }
 
 func DrawWheat() {

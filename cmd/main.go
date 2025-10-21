@@ -27,10 +27,10 @@ func drawScene() {
 	world.DrawWorld()
 	world.DrawBottomLamp()
 	world.DrawDoors()
+	mobs.DrawMobs()
 
 	player.DrawPlayerTexture()
-	mobs.DrawGhosts()
-	mobs.DrawMobs()
+	mobs.SpawnMobs(5, "bat")
 
 	world.DrawWheat()
 	world.DrawPumpkinLamp()
@@ -46,7 +46,6 @@ func init() {
 	rl.InitWindow(screenWidth, screenHeight, "spook 'n loot - a game by joeel56")
 	rl.SetExitKey(0)
 	rl.SetTargetFPS(60)
-	player.InitPlayer()
 
 	world.InitWorld()
 	world.InitDoors()
@@ -55,7 +54,7 @@ func init() {
 
 	world.LoadMap("pkg/world/map.json")
 
-	mobs.InitGhost()
+	player.InitPlayer()
 	mobs.InitMobs()
 
 	printDebug = false
@@ -105,23 +104,13 @@ func update() {
 	if mobs.IsMobAlive() {
 		closestMobIndex := mobs.GetClosestMobIndex(playerPos)
 		if closestMobIndex != -1 {
-			mobPos := mobs.GetMobPositionByIndex(closestMobIndex)
-			player.TryAttack(mobPos, func(damage float32) {
+			// Use mob hitbox center for reliable melee range checks
+			mobCenter := mobs.GetMobHitboxCenterByIndex(closestMobIndex)
+			player.TryAttack(mobCenter, func(damage float32) {
 				mobs.DamageMob(closestMobIndex, damage)
 			})
 		}
 	}
-	//mobs.UpdateGhostSpawning()
-	/*
-		player.PlayerUseTools()
-		items.UpdateItems() */
-
-	/* 	//rl.UpdateMusicStream(music)
-	   	if musicPaused {
-	   		rl.PauseMusicStream(music)
-	   	} else {
-	   		rl.ResumeMusicStream(music)
-	   	} */
 }
 
 func render() {
@@ -140,8 +129,6 @@ func render() {
 		debug.DrawDebug(debug.DebugText())
 	}
 
-	/* 	userinterface.DrawUserInterface() */
-
 	rl.EndDrawing()
 }
 
@@ -150,11 +137,8 @@ func quit() {
 	world.UnloadWorldTexture()
 	world.UnloadDoorsTextures()
 	world.UnloadPumpkinLamps()
-	mobs.UnloadGhostTexture()
-	/*
-		userinterface.UnloadUserInterface() */
-	//	rl.UnloadMusicStream(music)
-	//	rl.CloseAudioDevice()
+	mobs.UnloadMobsTexture()
+
 	rl.CloseWindow()
 }
 

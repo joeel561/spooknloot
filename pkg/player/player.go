@@ -1,7 +1,6 @@
 package player
 
 import (
-	"fmt"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -47,16 +46,17 @@ var (
 	healthbarDir     int     = 0
 	healthBarSrc     rl.Rectangle
 
-	lastAttackTime int
-	attackCooldown int     = 30
 	attackRange    float32 = 40
 	isAttacking    bool
 	attackDuration int = 15
 	attackTimer    int
 	attackPressed  bool
+	attackHasHit   bool
 
 	healthRegenTimer    int = 0
 	healthRegenInterval int = 120
+
+	takeDamage bool
 
 	Cam rl.Camera2D
 
@@ -165,19 +165,25 @@ func PlayerInput() {
 
 	if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
 		playerAttack = true
+		attackPressed = true
 	}
 }
 
 func TryAttack(targetPos rl.Vector2, attackFunc func(float32)) bool {
-	if attackPressed && frameCount-lastAttackTime >= attackCooldown && !attackActive {
-		playerPos := rl.NewVector2(PlayerDest.X, PlayerDest.Y)
-		dist := rl.Vector2Distance(playerPos, targetPos)
 
+	// Deal damage once per swing when in the mid-swing window
+	if attackActive && !attackHasHit {
+		// Use hitbox centers for more accurate melee distance
+		px := PlayerHitBox.X + (PlayerHitBox.Width / 2)
+		py := PlayerHitBox.Y + (PlayerHitBox.Height / 2)
+		playerCenter := rl.NewVector2(px, py)
+
+		dist := rl.Vector2Distance(playerCenter, targetPos)
 		if dist <= attackRange {
 			attackFunc(1.2)
-			lastAttackTime = frameCount
-			attackActive = true
+			attackHasHit = true
 			attackTimer = attackDuration
+			playerAttack = false
 			attackPressed = false
 			return true
 		}
@@ -194,10 +200,32 @@ func PlayerMoving() {
 		attackActive = true
 		playerFrameAttack = 0
 		frameCountAttack = 0
+		attackHasHit = false
 
 		playerDirections()
 
 		playerAttack = false
+	}
+
+	if takeDamage {
+		if playerFrame >= 2 {
+			playerFrame = 0
+		}
+
+		switch baseFacing {
+		case DirMoveDown:
+			playerDir = DirDamageDown
+		case DirMoveUp:
+			playerDir = DirDamageUp
+		case DirMoveLeft:
+			playerDir = DirDamageLeft
+		case DirMoveRight:
+			playerDir = DirDamageRight
+		default:
+			playerDir = DirDamageDown
+		}
+
+		takeDamage = false
 	}
 
 	if attackActive {
@@ -205,7 +233,7 @@ func PlayerMoving() {
 		if frameCountAttack%4 == 0 {
 			playerFrameAttack++
 		}
-		if playerFrameAttack >= 5 {
+		if playerFrameAttack >= 4 {
 			attackActive = false
 			playerFrameAttack = 0
 
@@ -306,9 +334,7 @@ func PlayerMoving() {
 
 	frameCount++
 
-	// Handle death animation progression independent of movement input
 	if IsPlayerDead() {
-		// Lock direction to a dead variant based on last facing
 		switch baseFacing {
 		case DirMoveUp:
 			playerDir = DirDeadUp
@@ -324,22 +350,17 @@ func PlayerMoving() {
 			if frameCount%8 == 1 {
 				playerFrameDead++
 			}
-			// Assuming 8-frame death strip: indices 0..7
 			if playerFrameDead >= 7 {
 				playerFrameDead = 7
 				deathAnimationComplete = true
 			}
 		}
 	}
-	if playerFrame >= 4 {
+	if playerFrame >= 3 {
 		playerFrame = 0
 	}
 
-	if playerSpeed == 2 && playerFrame >= 3 {
-		playerFrame = 0
-	}
-
-	if !PlayerMove && playerFrame > 3 {
+	if !PlayerMove && playerFrame >= 3 {
 		playerFrame = 0
 	}
 
@@ -419,7 +440,6 @@ func PlayerOpenHouseDoor() {
 }
 
 func RegenerateHealth() {
-	// Do not regenerate while dead
 	if IsPlayerDead() {
 		return
 	}
@@ -453,14 +473,9 @@ func UpdateHealthBar() {
 	}
 }
 
-func SetPlayerDamageState() {
-	playerDir = Direction(DirDamageDown)
-
-	if playerFrame >= 2 {
-		playerFrame = 0
-	}
-
-	fmt.Println(playerFrame)
+func SetPlayerDamageState() bool {
+	takeDamage = true
+	return takeDamage
 }
 
 func TakeDamage(damage float32) {
@@ -486,8 +501,6 @@ func DrawHealthBar() {
 	rl.DrawTexturePro(healthBarTexture, healthBarSrc, healthBarDest, rl.NewVector2(0, 0), 0, rl.White)
 }
 
-// SetHealthBarScale allows changing the on-screen scale of the health bar.
-// Example: SetHealthBarScale(6) to make it 6x the source size.
 func SetHealthBarScale(scale float32) {
 	if scale < 1 {
 		scale = 1
@@ -507,7 +520,6 @@ func IsPlayerDead() bool {
 	return currentHealth <= 0
 }
 
-// HasPlayerDeathAnimationFinished indicates if the death animation reached its last frame
 func HasPlayerDeathAnimationFinished() bool {
 	return deathAnimationComplete
 }
@@ -523,9 +535,8 @@ func ResetPlayer() {
 	playerUp, playerDown, playerLeft, playerRight = false, false, false, false
 	isAttacking = false
 	attackTimer = 0
-	attackPressed = false
+	playerAttack = false
 	frameCount = 0
-	lastAttackTime = 0
 	healthRegenTimer = 0
 	deathAnimationComplete = false
 
