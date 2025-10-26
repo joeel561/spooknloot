@@ -11,13 +11,14 @@ import (
 )
 
 const (
-	screenWidth  = 1920
-	screenHeight = 1080
+	screenWidth  = 1500
+	screenHeight = 900
 )
 
 var (
-	running = true
-	bgColor = rl.NewColor(143, 77, 87, 1)
+	running        = true
+	worldBgColor   = rl.NewColor(143, 77, 87, 1)
+	dungeonBgColor = rl.NewColor(41, 29, 43, 1)
 
 	musicPaused bool
 	music       rl.Music
@@ -50,7 +51,21 @@ func drawScene() {
 }
 
 func init() {
-	rl.InitWindow(screenWidth, screenHeight, "spook 'n loot - a game by joeel56")
+
+	monitor := rl.GetCurrentMonitor()
+	monW := rl.GetMonitorWidth(monitor)
+	monH := rl.GetMonitorHeight(monitor)
+
+	winW := int32(screenWidth)
+	winH := int32(screenHeight)
+	if monW > 0 && int32(monW) < winW {
+		winW = int32(monW)
+	}
+	if monH > 0 && int32(monH) < winH {
+		winH = int32(monH)
+	}
+
+	rl.InitWindow(winW, winH, "spook 'n loot - a game by joeel56")
 	rl.SetExitKey(0)
 	rl.SetTargetFPS(60)
 
@@ -84,7 +99,6 @@ func input() {
 		running = false
 	}
 
-	// temporary dev toggle to exit dungeon
 	if inDungeon && rl.IsKeyPressed(rl.KeyBackspace) {
 		exitDungeon()
 	}
@@ -99,7 +113,6 @@ func update() {
 	}
 
 	if player.IsPlayerDead() {
-		// Keep updating to progress the death animation
 		player.PlayerMoving()
 		if player.HasPlayerDeathAnimationFinished() {
 			player.ResetPlayer()
@@ -144,7 +157,11 @@ func render() {
 	var cam = player.Cam
 
 	rl.BeginDrawing()
-	rl.ClearBackground(bgColor)
+	if inDungeon {
+		rl.ClearBackground(dungeonBgColor)
+	} else {
+		rl.ClearBackground(worldBgColor)
+	}
 	rl.BeginMode2D(cam)
 
 	drawScene()

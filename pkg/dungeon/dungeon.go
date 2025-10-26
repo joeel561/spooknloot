@@ -41,13 +41,13 @@ var (
 )
 
 // Tile indices mapping for spritesheet:
-// 0 floor, 1 wall, 2 corner TL, 3 corner TR, 4 corner BL, 5 corner BR
+// 0 floor, 1 top, 2 bottom, 3 left, 4 right, 5 TL, 6 TR, 7 BL, 8 BR, 9 exit.
 
 func Init() {
 	if initialized {
 		return
 	}
-	dungeonTexture = rl.LoadTexture("assets/world/spritesheet.png")
+	dungeonTexture = rl.LoadTexture("assets/dungeon/spritesheet.png")
 	rl.SetTextureFilter(dungeonTexture, rl.FilterPoint)
 	tileSrc = rl.NewRectangle(0, 0, tileSize, tileSize)
 	tileDest = rl.NewRectangle(0, 0, tileSize, tileSize)
@@ -124,20 +124,22 @@ func Generate() {
 
 		ex, ey := rooms[len(rooms)-1].Center()
 		exitPx = rl.NewRectangle(float32(ex*tileSize), float32(ey*tileSize), tileSize, tileSize)
+		// mark exit with dedicated sprite index 9 (non-colliding)
+		tiles[ey][ex] = 9
 	} else {
 		spawnPx = rl.NewVector2(float32(2*tileSize), float32(2*tileSize))
 		exitPx = rl.NewRectangle(float32((mapW-3)*tileSize), float32((mapH-3)*tileSize), tileSize, tileSize)
 	}
 
-	// Classify wall corners 2..5 for nicer visuals
+	// Classify walls and corners using provided indices
 	classifyCorners()
 
-	// Build colliders for any non-floor tiles (1..5)
+	// Build colliders for any wall tiles (1..8); ignore empty (-1) and exit (9)
 	colliders = colliders[:0]
 	for y := 0; y < mapH; y++ {
 		for x := 0; x < mapW; x++ {
 			t := tiles[y][x]
-			if t != 0 {
+			if t > 0 && t != 9 { // 1..8 are walls
 				r := rl.NewRectangle(float32(x*tileSize), float32(y*tileSize), tileSize, tileSize)
 				colliders = append(colliders, r)
 			}
@@ -164,7 +166,6 @@ func carveCorridor(x1, y1, x2, y2 int) {
 }
 
 func classifyCorners() {
-	// Copy of tiles to read neighbors without interference
 	original := make([][]int, mapH)
 	for y := 0; y < mapH; y++ {
 		original[y] = make([]int, mapW)
@@ -178,16 +179,10 @@ func classifyCorners() {
 		return original[y][x] == 0
 	}
 
-	isWall := func(x, y int) bool {
-		if x < 0 || y < 0 || x >= mapW || y >= mapH {
-			return true
-		}
-		return original[y][x] != 0
-	}
-
 	for y := 0; y < mapH; y++ {
 		for x := 0; x < mapW; x++ {
-			if original[y][x] == 0 {
+			// Keep floors and exit as-is
+			if original[y][x] == 0 || original[y][x] == 9 {
 				continue
 			}
 
@@ -195,29 +190,63 @@ func classifyCorners() {
 			down := isFloor(x, y+1)
 			left := isFloor(x-1, y)
 			right := isFloor(x+1, y)
+			diagUL := isFloor(x-1, y-1)
+			diagUR := isFloor(x+1, y-1)
+			diagDL := isFloor(x-1, y+1)
+			diagDR := isFloor(x+1, y+1)
 
-			// Corners where two adjacent sides are floor and the other sides are walls
-			// TL corner: floor right and floor down
-			if right && down && isWall(x-1, y) && isWall(x, y-1) {
-				tiles[y][x] = 2
+			nearFloor := up || down || left || right || diagUL || diagUR || diagDL || diagDR
+			if !nearFloor {
+				// Far from any walkable area: make empty
+				tiles[y][x] = -1
 				continue
 			}
-			// TR corner: floor left and floor down
-			if left && down && isWall(x+1, y) && isWall(x, y-1) {
-				tiles[y][x] = 3
-				continue
-			}
-			// BL corner: floor right and floor up
-			if right && up && isWall(x-1, y) && isWall(x, y+1) {
-				tiles[y][x] = 4
-				continue
-			}
-			// BR corner: floor left and floor up
-			if left && up && isWall(x+1, y) && isWall(x, y+1) {
+
+			// Corners first (5..8) — detect diagonal-only adjacency
+			if diagDR && !right && !down {
+				// TL corner: floor at down-right
 				tiles[y][x] = 5
 				continue
 			}
-			// Otherwise keep as generic wall (1)
+			if diagDL && !left && !down {
+				// TR corner: floor at down-left
+				tiles[y][x] = 6
+				continue
+			}
+			if diagUR && !right && !up {
+				// BL corner: floor at up-right
+				tiles[y][x] = 7
+				continue
+			}
+			if diagUL && !left && !up {
+				// BR corner: floor at up-left
+				tiles[y][x] = 8
+				continue
+			}
+
+			// Edges (1..4)
+			if down && !up {
+				// Top edge
+				tiles[y][x] = 1
+				continue
+			}
+			if up && !down {
+				// Bottom edge
+				tiles[y][x] = 2
+				continue
+			}
+			if right && !left {
+				// Left edge
+				tiles[y][x] = 3
+				continue
+			}
+			if left && !right {
+				// Right edge
+				tiles[y][x] = 4
+				continue
+			}
+
+			// Default to top edge when multiple floors around
 			tiles[y][x] = 1
 		}
 	}
@@ -241,7 +270,6 @@ func Draw() {
 			tileDest.X = float32(x * tileSize)
 			tileDest.Y = float32(y * tileSize)
 
-			// Draw floor under walls for completeness
 			if t != 0 {
 				floorSrcX := float32(tileSize) * float32((0)%int(texColumns))
 				floorSrcY := float32(tileSize) * float32((0)/int(texColumns))
