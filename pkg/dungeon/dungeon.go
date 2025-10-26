@@ -224,6 +224,11 @@ func classifyCorners() {
 				continue
 			}
 
+			if y == 0 && down {
+				tiles[y][x] = 1
+				continue
+			}
+
 			// Edges (1..4)
 			if down && !up {
 				// Top edge

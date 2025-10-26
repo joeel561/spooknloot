@@ -1,6 +1,7 @@
 package main
 
 import (
+	"spooknloot/pkg/boss"
 	"spooknloot/pkg/debug"
 	"spooknloot/pkg/dungeon"
 	"spooknloot/pkg/mobs"
@@ -11,8 +12,9 @@ import (
 )
 
 const (
-	screenWidth  = 1500
-	screenHeight = 900
+	screenWidth               = 1500
+	screenHeight              = 900
+	exitCooldownFramesDefault = 20
 )
 
 var (
@@ -25,25 +27,35 @@ var (
 	printDebug  bool
 
 	// game mode
-	inDungeon     bool
-	savedWorldPos rl.Vector2
+	inDungeon          bool
+	inBoss             bool
+	dungeonsCleared    int
+	savedWorldPos      rl.Vector2
+	exitCooldownFrames int
 )
 
 func drawScene() {
-	if inDungeon {
+	if inBoss {
+		boss.Draw()
+	} else if inDungeon {
 		dungeon.Draw()
 	} else {
 		world.DrawWorld()
 		world.DrawBottomLamp()
 		world.DrawDoors()
 		mobs.DrawMobs()
-		world.DrawWheat()
 		world.DrawPumpkinLamp()
-		world.DrawTopLamp()
-		world.DrawCauldron()
 	}
 
 	player.DrawPlayerTexture()
+
+	if !inDungeon {
+		world.DrawWheat()
+		world.DrawTopLamp()
+		world.DrawCauldron()
+		mobs.SpawnMobs(5, "bat")
+
+	}
 
 	if printDebug {
 		debug.DrawPlayerOutlines()
@@ -80,6 +92,8 @@ func init() {
 	mobs.InitMobs()
 
 	dungeon.Init()
+	boss.Init()
+	boss.LoadMap("pkg/boss/map.json")
 
 	printDebug = false
 }
@@ -102,12 +116,15 @@ func input() {
 	if inDungeon && rl.IsKeyPressed(rl.KeyBackspace) {
 		exitDungeon()
 	}
+	if inBoss && rl.IsKeyPressed(rl.KeyBackspace) {
+		exitBoss()
+	}
 }
 
 func update() {
 	running = !rl.WindowShouldClose()
 
-	if !inDungeon {
+	if !inDungeon && !inBoss {
 		world.LightLamps()
 		world.LightPumpkinLamps()
 	}
@@ -128,11 +145,11 @@ func update() {
 		player.SetPlayerDamageState()
 		player.TakeDamage(0.5)
 	}
-	if !inDungeon {
+	if !inDungeon && !inBoss {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
 	}
 
-	if !inDungeon && mobs.IsMobAlive() {
+	if !inDungeon && !inBoss && mobs.IsMobAlive() {
 		closestMobIndex := mobs.GetClosestMobIndex(playerPos)
 		if closestMobIndex != -1 {
 			// Use mob hitbox center for reliable melee range checks
@@ -143,13 +160,24 @@ func update() {
 		}
 	}
 
-	if !inDungeon {
+	if !inDungeon && !inBoss {
 		checkEnterDungeon()
-	} else {
-		// exit when hitting dungeon exit tile
-		if dungeon.IsPlayerAtExit(player.PlayerHitBox) {
-			exitDungeon()
+	} else if inDungeon {
+		if exitCooldownFrames > 0 {
+			exitCooldownFrames--
 		}
+		// exit when hitting dungeon exit tile
+		if exitCooldownFrames <= 0 && dungeon.IsPlayerAtExit(player.PlayerHitBox) {
+			// increment cleared counter and decide next state
+			dungeonsCleared++
+			if dungeonsCleared >= 5 {
+				enterBoss()
+			} else {
+				nextDungeon()
+			}
+		}
+	} else if inBoss {
+		// boss room update hooks could go here
 	}
 }
 
@@ -157,7 +185,7 @@ func render() {
 	var cam = player.Cam
 
 	rl.BeginDrawing()
-	if inDungeon {
+	if inDungeon || inBoss {
 		rl.ClearBackground(dungeonBgColor)
 	} else {
 		rl.ClearBackground(worldBgColor)
@@ -198,7 +226,6 @@ func main() {
 }
 
 func checkEnterDungeon() {
-	// enter when overlapping the house door
 	if player.PlayerHitBox.X < float32(world.HouseDoorDest.X+world.HouseDoorDest.Width) &&
 		player.PlayerHitBox.X+player.PlayerHitBox.Width > float32(world.HouseDoorDest.X) &&
 		player.PlayerHitBox.Y < float32(world.HouseDoorDest.Y+world.HouseDoorDest.Height) &&
@@ -218,6 +245,7 @@ func enterDungeon() {
 	player.SetExternalColliders(dungeon.GetColliders())
 	spawn := dungeon.GetSpawnPosition()
 	player.SetPosition(spawn.X, spawn.Y)
+	exitCooldownFrames = exitCooldownFramesDefault
 }
 
 func exitDungeon() {
@@ -226,5 +254,36 @@ func exitDungeon() {
 	}
 	inDungeon = false
 	player.ClearExternalColliders()
+	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
+}
+
+func nextDungeon() {
+	// Keep the player in dungeon mode and generate a new layout
+	// Reset colliders and move player to the new spawn
+	dungeon.Generate()
+	player.SetExternalColliders(dungeon.GetColliders())
+	spawn := dungeon.GetSpawnPosition()
+	player.SetPosition(spawn.X, spawn.Y)
+	exitCooldownFrames = exitCooldownFramesDefault
+}
+
+func enterBoss() {
+	if inBoss {
+		return
+	}
+	inDungeon = false
+	inBoss = true
+
+	player.ClearExternalColliders()
+	spawn := boss.GetSpawnPosition()
+	player.SetPosition(spawn.X, spawn.Y)
+}
+
+func exitBoss() {
+	if !inBoss {
+		return
+	}
+	inBoss = false
+
 	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
 }

@@ -1,0 +1,14 @@
+{
+  "tileSize": 16,
+  "mapWidth": 40,
+  "mapHeight": 25,
+  "layers": [
+    { "name": "out", "tiles": [], "collider": false },
+    { "name": "background", "tiles": [], "collider": false },
+    { "name": "ground", "tiles": [], "collider": false },
+    { "name": "props", "tiles": [], "collider": false },
+    { "name": "spawn", "tiles": [], "collider": false }
+  ]
+}
+
+
