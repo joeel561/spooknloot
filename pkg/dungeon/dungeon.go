@@ -38,6 +38,7 @@ var (
 	exitPx         rl.Rectangle
 	colliders      []rl.Rectangle
 	initialized    bool
+	exitVisible    bool
 )
 
 // Tile indices mapping for spritesheet:
@@ -77,8 +78,8 @@ func Generate() {
 	for i := 0; i < maxRooms; i++ {
 		w := rand.Intn(maxSize-minSize+1) + minSize
 		h := rand.Intn(maxSize-minSize+1) + minSize
-		x := rand.Intn(mapW - w - 1)
-		y := rand.Intn(mapH - h - 1)
+		x := rand.Intn(mapW-w-2) + 1
+		y := rand.Intn(mapH-h-2) + 1
 
 		newRoom := Room{X: x, Y: y, W: w, H: h}
 
@@ -130,6 +131,9 @@ func Generate() {
 		spawnPx = rl.NewVector2(float32(2*tileSize), float32(2*tileSize))
 		exitPx = rl.NewRectangle(float32((mapW-3)*tileSize), float32((mapH-3)*tileSize), tileSize, tileSize)
 	}
+
+	// Exit starts hidden until all mobs are cleared
+	exitVisible = false
 
 	// Classify walls and corners using provided indices
 	classifyCorners()
@@ -270,8 +274,6 @@ func Draw() {
 			if t < 0 {
 				continue
 			}
-			tileSrc.X = float32(tileSize) * float32((t)%int(texColumns))
-			tileSrc.Y = float32(tileSize) * float32((t)/int(texColumns))
 			tileDest.X = float32(x * tileSize)
 			tileDest.Y = float32(y * tileSize)
 
@@ -280,6 +282,14 @@ func Draw() {
 				floorSrcY := float32(tileSize) * float32((0)/int(texColumns))
 				rl.DrawTexturePro(tex, rl.NewRectangle(floorSrcX, floorSrcY, tileSize, tileSize), tileDest, rl.NewVector2(0, 0), 0, rl.White)
 			}
+
+			// Skip drawing exit sprite if exit is hidden (keep floor only)
+			if t == 9 && !exitVisible {
+				continue
+			}
+
+			tileSrc.X = float32(tileSize) * float32((t)%int(texColumns))
+			tileSrc.Y = float32(tileSize) * float32((t)/int(texColumns))
 			rl.DrawTexturePro(tex, tileSrc, tileDest, rl.NewVector2(0, 0), 0, rl.White)
 		}
 	}
@@ -294,8 +304,50 @@ func GetSpawnPosition() rl.Vector2 {
 }
 
 func IsPlayerAtExit(playerHitbox rl.Rectangle) bool {
+	if !exitVisible {
+		return false
+	}
 	return playerHitbox.X < exitPx.X+exitPx.Width &&
 		playerHitbox.X+playerHitbox.Width > exitPx.X &&
 		playerHitbox.Y < exitPx.Y+exitPx.Height &&
 		playerHitbox.Y+playerHitbox.Height > exitPx.Y
+}
+
+func GetRandomFloorPositions(n int) []rl.Vector2 {
+	if len(tiles) == 0 || n <= 0 {
+		return nil
+	}
+
+	floorTiles := make([]rl.Vector2, 0, mapW*mapH)
+	for y := 0; y < mapH; y++ {
+		for x := 0; x < mapW; x++ {
+			if tiles[y][x] == 0 { // floor
+				px := float32(x * tileSize)
+				py := float32(y * tileSize)
+				floorTiles = append(floorTiles, rl.NewVector2(px, py))
+			}
+		}
+	}
+
+	if len(floorTiles) == 0 {
+		return nil
+	}
+
+	rand.Shuffle(len(floorTiles), func(i, j int) { floorTiles[i], floorTiles[j] = floorTiles[j], floorTiles[i] })
+	if n > len(floorTiles) {
+		n = len(floorTiles)
+	}
+	return append([]rl.Vector2(nil), floorTiles[:n]...)
+}
+
+func ShowExit() {
+	exitVisible = true
+}
+
+func HideExit() {
+	exitVisible = false
+}
+
+func IsExitVisible() bool {
+	return exitVisible
 }

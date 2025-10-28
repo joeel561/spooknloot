@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"spooknloot/pkg/boss"
 	"spooknloot/pkg/debug"
 	"spooknloot/pkg/dungeon"
@@ -22,16 +23,23 @@ var (
 	worldBgColor   = rl.NewColor(143, 77, 87, 1)
 	dungeonBgColor = rl.NewColor(41, 29, 43, 1)
 
-	musicPaused bool
-	music       rl.Music
-	printDebug  bool
+	musicPaused  bool
+	worldMusic   rl.Music
+	dungeonMusic rl.Music
+	bossMusic    rl.Music
+	currentMusic string
+	printDebug   bool
 
-	// game mode
-	inDungeon          bool
-	inBoss             bool
-	dungeonsCleared    int
-	savedWorldPos      rl.Vector2
-	exitCooldownFrames int
+	inDungeon           bool
+	inBoss              bool
+	dungeonsCleared     int
+	savedWorldPos       rl.Vector2
+	exitCooldownFrames  int
+	dungeonSpawnCount   int
+	dungeonSpawnBaseMin int = 5
+	dungeonSpawnBaseMax int = 10
+	exitSoundPlayed     bool
+	mobsClearFrames     int
 )
 
 func drawScene() {
@@ -39,6 +47,7 @@ func drawScene() {
 		boss.Draw()
 	} else if inDungeon {
 		dungeon.Draw()
+		mobs.DrawMobs()
 	} else {
 		world.DrawWorld()
 		world.DrawBottomLamp()
@@ -53,7 +62,7 @@ func drawScene() {
 		world.DrawWheat()
 		world.DrawTopLamp()
 		world.DrawCauldron()
-		mobs.SpawnMobs(5, "bat")
+		mobs.SpawnMobs(8, "random")
 
 	}
 
@@ -81,6 +90,21 @@ func init() {
 	rl.SetExitKey(0)
 	rl.SetTargetFPS(60)
 
+	rl.InitAudioDevice()
+
+	if _, err := os.Stat("assets/audio/world.mp3"); err == nil {
+		worldMusic = rl.LoadMusicStream("assets/audio/world.mp3")
+		rl.SetMusicVolume(worldMusic, 0.2)
+	}
+	if _, err := os.Stat("assets/audio/dungeon.mp3"); err == nil {
+		dungeonMusic = rl.LoadMusicStream("assets/audio/dungeon.mp3")
+		rl.SetMusicVolume(dungeonMusic, 0.6)
+	}
+	if _, err := os.Stat("assets/audio/boss.mp3"); err == nil {
+		bossMusic = rl.LoadMusicStream("assets/audio/boss.mp3")
+		rl.SetMusicVolume(bossMusic, 0.6)
+	}
+
 	world.InitWorld()
 	world.InitDoors()
 	world.InitLamps()
@@ -96,11 +120,22 @@ func init() {
 	boss.LoadMap("pkg/boss/map.json")
 
 	printDebug = false
+
+	playTrack("world")
 }
 
 func input() {
 	if rl.IsKeyPressed(rl.KeyF10) {
 		rl.ToggleBorderlessWindowed()
+	}
+
+	if rl.IsKeyPressed(rl.KeyF7) {
+		musicPaused = !musicPaused
+		if musicPaused {
+			pauseCurrentMusic()
+		} else {
+			resumeCurrentMusic()
+		}
 	}
 
 	player.PlayerInput()
@@ -124,6 +159,8 @@ func input() {
 func update() {
 	running = !rl.WindowShouldClose()
 
+	updateCurrentMusic()
+
 	if !inDungeon && !inBoss {
 		world.LightLamps()
 		world.LightPumpkinLamps()
@@ -132,8 +169,16 @@ func update() {
 	if player.IsPlayerDead() {
 		player.PlayerMoving()
 		if player.HasPlayerDeathAnimationFinished() {
-			player.ResetPlayer()
+			if inDungeon {
+				exitDungeon()
+			} else if inBoss {
+				exitBoss()
+			}
+			dungeonsCleared = 0
+			dungeonSpawnCount = 0
+
 			mobs.ResetMobs()
+			player.ResetPlayer()
 		}
 		return
 	}
@@ -143,16 +188,17 @@ func update() {
 	playerPos := rl.NewVector2(player.PlayerHitBox.X, player.PlayerHitBox.Y)
 	attackPlayerFunc := func() {
 		player.SetPlayerDamageState()
-		player.TakeDamage(0.5)
+		player.TakeDamage(0.1)
 	}
-	if !inDungeon && !inBoss {
+	if inDungeon {
+		mobs.MobMoving(playerPos, attackPlayerFunc)
+	} else if !inBoss {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
 	}
 
-	if !inDungeon && !inBoss && mobs.IsMobAlive() {
+	if mobs.IsMobAlive() {
 		closestMobIndex := mobs.GetClosestMobIndex(playerPos)
 		if closestMobIndex != -1 {
-			// Use mob hitbox center for reliable melee range checks
 			mobCenter := mobs.GetMobHitboxCenterByIndex(closestMobIndex)
 			player.TryAttack(mobCenter, func(damage float32) {
 				mobs.DamageMob(closestMobIndex, damage)
@@ -166,9 +212,25 @@ func update() {
 		if exitCooldownFrames > 0 {
 			exitCooldownFrames--
 		}
-		// exit when hitting dungeon exit tile
-		if exitCooldownFrames <= 0 && dungeon.IsPlayerAtExit(player.PlayerHitBox) {
-			// increment cleared counter and decide next state
+
+		if mobs.IsMobAlive() {
+			dungeon.HideExit()
+			exitSoundPlayed = false
+			mobsClearFrames = 0
+		} else {
+			if mobsClearFrames < 6 {
+				mobsClearFrames++
+			}
+			if mobsClearFrames >= 6 {
+				dungeon.ShowExit()
+				if !exitSoundPlayed {
+					world.PlayDoorOpenSound()
+					exitSoundPlayed = true
+				}
+			}
+		}
+
+		if exitCooldownFrames <= 0 && !mobs.IsMobAlive() && dungeon.IsPlayerAtExit(player.PlayerHitBox) {
 			dungeonsCleared++
 			if dungeonsCleared >= 5 {
 				enterBoss()
@@ -205,6 +267,17 @@ func render() {
 }
 
 func quit() {
+	stopAllTracks()
+	if worldMusic.CtxType != 0 {
+		rl.UnloadMusicStream(worldMusic)
+	}
+	if dungeonMusic.CtxType != 0 {
+		rl.UnloadMusicStream(dungeonMusic)
+	}
+	if bossMusic.CtxType != 0 {
+		rl.UnloadMusicStream(bossMusic)
+	}
+	rl.CloseAudioDevice()
 	player.UnloadPlayerTexture()
 	world.UnloadWorldTexture()
 	world.UnloadDoorsTextures()
@@ -225,6 +298,101 @@ func main() {
 	quit()
 }
 
+func playTrack(which string) {
+	if currentMusic == which {
+		return
+	}
+	stopAllTracks()
+	switch which {
+	case "dungeon":
+		if dungeonMusic.CtxType != 0 {
+			rl.PlayMusicStream(dungeonMusic)
+			if musicPaused {
+				rl.PauseMusicStream(dungeonMusic)
+			}
+		}
+	case "boss":
+		if bossMusic.CtxType != 0 {
+			rl.PlayMusicStream(bossMusic)
+			if musicPaused {
+				rl.PauseMusicStream(bossMusic)
+			}
+		}
+	default:
+		if worldMusic.CtxType != 0 {
+			rl.PlayMusicStream(worldMusic)
+			if musicPaused {
+				rl.PauseMusicStream(worldMusic)
+			}
+		}
+		which = "world"
+	}
+	currentMusic = which
+}
+
+func stopAllTracks() {
+	if worldMusic.CtxType != 0 {
+		rl.StopMusicStream(worldMusic)
+	}
+	if dungeonMusic.CtxType != 0 {
+		rl.StopMusicStream(dungeonMusic)
+	}
+	if bossMusic.CtxType != 0 {
+		rl.StopMusicStream(bossMusic)
+	}
+}
+
+func updateCurrentMusic() {
+	switch currentMusic {
+	case "dungeon":
+		if dungeonMusic.CtxType != 0 {
+			rl.UpdateMusicStream(dungeonMusic)
+		}
+	case "boss":
+		if bossMusic.CtxType != 0 {
+			rl.UpdateMusicStream(bossMusic)
+		}
+	case "world":
+		if worldMusic.CtxType != 0 {
+			rl.UpdateMusicStream(worldMusic)
+		}
+	}
+}
+
+func pauseCurrentMusic() {
+	switch currentMusic {
+	case "dungeon":
+		if dungeonMusic.CtxType != 0 {
+			rl.PauseMusicStream(dungeonMusic)
+		}
+	case "boss":
+		if bossMusic.CtxType != 0 {
+			rl.PauseMusicStream(bossMusic)
+		}
+	case "world":
+		if worldMusic.CtxType != 0 {
+			rl.PauseMusicStream(worldMusic)
+		}
+	}
+}
+
+func resumeCurrentMusic() {
+	switch currentMusic {
+	case "dungeon":
+		if dungeonMusic.CtxType != 0 {
+			rl.ResumeMusicStream(dungeonMusic)
+		}
+	case "boss":
+		if bossMusic.CtxType != 0 {
+			rl.ResumeMusicStream(bossMusic)
+		}
+	case "world":
+		if worldMusic.CtxType != 0 {
+			rl.ResumeMusicStream(worldMusic)
+		}
+	}
+}
+
 func checkEnterDungeon() {
 	if player.PlayerHitBox.X < float32(world.HouseDoorDest.X+world.HouseDoorDest.Width) &&
 		player.PlayerHitBox.X+player.PlayerHitBox.Width > float32(world.HouseDoorDest.X) &&
@@ -243,9 +411,30 @@ func enterDungeon() {
 
 	dungeon.Generate()
 	player.SetExternalColliders(dungeon.GetColliders())
+	mobs.SetExternalColliders(dungeon.GetColliders())
 	spawn := dungeon.GetSpawnPosition()
 	player.SetPosition(spawn.X, spawn.Y)
 	exitCooldownFrames = exitCooldownFramesDefault
+
+	baseMin, baseMax := dungeonSpawnBaseMin, dungeonSpawnBaseMax
+	if dungeonSpawnCount == 0 {
+		dungeonSpawnCount = baseMin + int(rl.GetRandomValue(0, int32(baseMax-baseMin)))
+	} else {
+		inc := int(rl.GetRandomValue(2, 5))
+		dungeonSpawnCount += inc
+		if dungeonSpawnCount > baseMax+dungeonSpawnBaseMax {
+			dungeonSpawnCount = baseMax + dungeonSpawnBaseMax
+		}
+	}
+
+	positions := dungeon.GetRandomFloorPositions(dungeonSpawnCount)
+	mobs.ResetMobs()
+	mobs.SpawnMobsAtPositions(positions, "random")
+
+	exitSoundPlayed = false
+	mobsClearFrames = 0
+
+	playTrack("dungeon")
 }
 
 func exitDungeon() {
@@ -254,17 +443,39 @@ func exitDungeon() {
 	}
 	inDungeon = false
 	player.ClearExternalColliders()
+	mobs.ClearExternalColliders()
 	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
+	mobs.ResetMobs()
+	playTrack("world")
 }
 
 func nextDungeon() {
-	// Keep the player in dungeon mode and generate a new layout
-	// Reset colliders and move player to the new spawn
 	dungeon.Generate()
 	player.SetExternalColliders(dungeon.GetColliders())
+	mobs.SetExternalColliders(dungeon.GetColliders())
 	spawn := dungeon.GetSpawnPosition()
 	player.SetPosition(spawn.X, spawn.Y)
 	exitCooldownFrames = exitCooldownFramesDefault
+
+	baseMin, baseMax := dungeonSpawnBaseMin, dungeonSpawnBaseMax
+	if dungeonSpawnCount == 0 {
+		dungeonSpawnCount = baseMin + int(rl.GetRandomValue(0, int32(baseMax-baseMin)))
+	} else {
+		inc := int(rl.GetRandomValue(2, 5))
+		dungeonSpawnCount += inc
+		if dungeonSpawnCount > baseMax+dungeonSpawnBaseMax {
+			dungeonSpawnCount = baseMax + dungeonSpawnBaseMax
+		}
+	}
+
+	positions := dungeon.GetRandomFloorPositions(dungeonSpawnCount)
+	mobs.ResetMobs()
+	mobs.SpawnMobsAtPositions(positions, "random")
+
+	exitSoundPlayed = false
+	mobsClearFrames = 0
+
+	playTrack("dungeon")
 }
 
 func enterBoss() {
@@ -277,6 +488,8 @@ func enterBoss() {
 	player.ClearExternalColliders()
 	spawn := boss.GetSpawnPosition()
 	player.SetPosition(spawn.X, spawn.Y)
+
+	playTrack("boss")
 }
 
 func exitBoss() {
@@ -286,4 +499,5 @@ func exitBoss() {
 	inBoss = false
 
 	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
+	playTrack("world")
 }

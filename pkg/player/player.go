@@ -1,14 +1,16 @@
 package player
 
 import (
+	"os"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 const (
-	screenWidth  = 1500
-	screenHeight = 900
+	screenWidth          = 1500
+	screenHeight         = 900
+	camYOffset   float32 = 2
 )
 
 var (
@@ -46,12 +48,13 @@ var (
 	healthbarDir     int     = 0
 	healthBarSrc     rl.Rectangle
 
-	attackRange    float32 = 40
-	isAttacking    bool
-	attackDuration int = 15
-	attackTimer    int
-	attackPressed  bool
-	attackHasHit   bool
+	attackRange       float32 = 40
+	isAttacking       bool
+	attackDuration    int = 15
+	attackTimer       int
+	attackPressed     bool
+	attackHasHit      bool
+	playerDamageTimer int
 
 	healthRegenTimer    int = 0
 	healthRegenInterval int = 120
@@ -66,6 +69,15 @@ var (
 	// External collision handling (e.g., dungeon)
 	useExternalColliders bool
 	externalColliders    []rl.Rectangle
+
+	// Audio
+	attackSound        rl.Sound
+	attackSoundLoaded  bool
+	damageSound        rl.Sound
+	damageSoundLoaded  bool
+	walkingSound       rl.Sound
+	walkingSoundLoaded bool
+	lastFootstepFrame  int
 )
 
 type Direction int
@@ -115,7 +127,26 @@ func InitPlayer() {
 	PlayerHitBox = rl.NewRectangle(0, 0, 6, 6)
 
 	Cam = rl.NewCamera2D(rl.NewVector2(float32(screenWidth/2), float32(screenHeight/2)),
-		rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2))), 0, 4)
+		rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset)), 0, 4)
+
+	if _, err := os.Stat("assets/audio/attack.mp3"); err == nil {
+		attackSound = rl.LoadSound("assets/audio/attack.mp3")
+		rl.SetSoundVolume(attackSound, 0.6)
+		attackSoundLoaded = true
+	}
+
+	if _, err := os.Stat("assets/audio/damage.mp3"); err == nil {
+		damageSound = rl.LoadSound("assets/audio/damage.mp3")
+		rl.SetSoundVolume(damageSound, 0.6)
+		damageSoundLoaded = true
+	}
+
+	if _, err := os.Stat("assets/audio/walking.mp3"); err == nil {
+		walkingSound = rl.LoadSound("assets/audio/walking.mp3")
+		rl.SetSoundVolume(walkingSound, 0.35)
+		walkingSoundLoaded = true
+		lastFootstepFrame = -10
+	}
 }
 
 func DrawPlayerTexture() {
@@ -185,6 +216,7 @@ func TryAttack(targetPos rl.Vector2, attackFunc func(float32)) bool {
 		dist := rl.Vector2Distance(playerCenter, targetPos)
 		if dist <= attackRange {
 			attackFunc(1.2)
+			// stun mechanic removed
 			attackHasHit = true
 			attackTimer = attackDuration
 			playerAttack = false
@@ -200,11 +232,33 @@ func PlayerMoving() {
 	oldX, oldY = PlayerDest.X, PlayerDest.Y
 	playerSrc.X = playerSrc.Width * float32(playerFrame)
 
+	// Ensure attack sound is stopped if player is dead
+	if IsPlayerDead() {
+		if attackSoundLoaded && rl.IsSoundPlaying(attackSound) {
+			rl.StopSound(attackSound)
+		}
+		if damageSoundLoaded && rl.IsSoundPlaying(damageSound) {
+			rl.StopSound(damageSound)
+		}
+		if walkingSoundLoaded && rl.IsSoundPlaying(walkingSound) {
+			rl.StopSound(walkingSound)
+		}
+		attackActive = false
+	}
+
 	if playerAttack && !attackActive {
 		attackActive = true
 		playerFrameAttack = 0
 		frameCountAttack = 0
 		attackHasHit = false
+		if attackSoundLoaded && !rl.IsSoundPlaying(attackSound) {
+			rl.PlaySound(attackSound)
+		}
+
+		// Stop walking sound immediately on attack start
+		if walkingSoundLoaded && rl.IsSoundPlaying(walkingSound) {
+			rl.StopSound(walkingSound)
+		}
 
 		playerDirections()
 
@@ -212,10 +266,10 @@ func PlayerMoving() {
 	}
 
 	if takeDamage {
+		// Enter a short damage state; damage rows have 2 frames → clamp frames to [0,1]
 		if playerFrame >= 2 {
 			playerFrame = 0
 		}
-
 		switch baseFacing {
 		case DirMoveDown:
 			playerDir = DirDamageDown
@@ -228,14 +282,27 @@ func PlayerMoving() {
 		default:
 			playerDir = DirDamageDown
 		}
-
+		playerDamageTimer = 10
 		takeDamage = false
+
+		// Start damage sound on entering damage state
+		if damageSoundLoaded && !rl.IsSoundPlaying(damageSound) {
+			rl.PlaySound(damageSound)
+		}
+		// Stop walking sound while damaged
+		if walkingSoundLoaded && rl.IsSoundPlaying(walkingSound) {
+			rl.StopSound(walkingSound)
+		}
 	}
 
 	if attackActive {
 		frameCountAttack++
 		if frameCountAttack%4 == 0 {
 			playerFrameAttack++
+		}
+		// Keep attack sound playing only while attacking (restart if it ends mid-swing)
+		if attackSoundLoaded && !rl.IsSoundPlaying(attackSound) {
+			rl.PlaySound(attackSound)
 		}
 		if playerFrameAttack >= 4 {
 			attackActive = false
@@ -253,6 +320,9 @@ func PlayerMoving() {
 			default:
 				playerDir = DirIdleDown
 			}
+			if attackSoundLoaded && rl.IsSoundPlaying(attackSound) {
+				rl.StopSound(attackSound)
+			}
 		}
 	}
 
@@ -260,7 +330,7 @@ func PlayerMoving() {
 
 	if PlayerMove {
 		if playerUp {
-			if !attackActive {
+			if !attackActive && playerDamageTimer == 0 {
 				playerDir = DirMoveUp
 				baseFacing = DirMoveUp
 			}
@@ -275,7 +345,7 @@ func PlayerMoving() {
 			}
 		}
 		if playerDown {
-			if !attackActive {
+			if !attackActive && playerDamageTimer == 0 {
 				playerDir = DirMoveDown
 				baseFacing = DirMoveDown
 			}
@@ -290,7 +360,7 @@ func PlayerMoving() {
 			}
 		}
 		if playerLeft {
-			if !attackActive {
+			if !attackActive && playerDamageTimer == 0 {
 				playerDir = DirMoveLeft
 				baseFacing = DirMoveLeft
 			}
@@ -306,7 +376,7 @@ func PlayerMoving() {
 		}
 
 		if playerRight {
-			if !attackActive {
+			if !attackActive && playerDamageTimer == 0 {
 				playerDir = DirMoveRight
 				baseFacing = DirMoveRight
 			}
@@ -328,15 +398,51 @@ func PlayerMoving() {
 			if IsPlayerDead() {
 				playerFrameDead++
 			}
+			// Clamp damage frames to [0,1] while damage is active (damage rows only have 2 frames)
+			if playerDamageTimer > 0 && playerFrame >= 2 {
+				playerFrame = 0
+			}
+
+			// Footstep timing: play on specific animation frames while moving and not attacking/damaged
+			if walkingSoundLoaded && playerDamageTimer == 0 && !attackActive {
+				// Trigger on frames 0 and 2 to mimic left/right steps
+				if playerFrame == 0 || playerFrame == 2 {
+					if frameCount-lastFootstepFrame >= 8 { // minimal gap between steps
+						lastFootstepFrame = frameCount
+						if !rl.IsSoundPlaying(walkingSound) {
+							rl.PlaySound(walkingSound)
+						} else {
+							// Restart quickly to get a crisp step
+							rl.StopSound(walkingSound)
+							rl.PlaySound(walkingSound)
+						}
+					}
+				}
+			}
 		}
 
 		PlayerOpenHouseDoor()
 
 	} else if frameCount%45 == 1 {
 		playerFrame++
+		if playerDamageTimer > 0 && playerFrame >= 2 {
+			playerFrame = 0
+		}
 	}
 
 	frameCount++
+	if playerDamageTimer > 0 {
+		playerDamageTimer--
+		// Keep damage sound active while damage timer runs
+		if damageSoundLoaded && !rl.IsSoundPlaying(damageSound) {
+			rl.PlaySound(damageSound)
+		}
+	} else {
+		// Stop damage sound when damage state ends
+		if damageSoundLoaded && rl.IsSoundPlaying(damageSound) {
+			rl.StopSound(damageSound)
+		}
+	}
 
 	if IsPlayerDead() {
 		switch baseFacing {
@@ -397,7 +503,13 @@ func PlayerMoving() {
 		PlayerCollisionLamps()
 	}
 
-	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
+	if !PlayerMove {
+		if walkingSoundLoaded && rl.IsSoundPlaying(walkingSound) {
+			rl.StopSound(walkingSound)
+		}
+	}
+
+	Cam.Target = rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset))
 
 	PlayerMove, playerJumping = false, false
 	playerUp, playerDown, playerLeft, playerRight = false, false, false, false
@@ -561,7 +673,15 @@ func ResetPlayer() {
 	healthRegenTimer = 0
 	deathAnimationComplete = false
 
-	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
+	attackActive = false
+	if attackSoundLoaded && rl.IsSoundPlaying(attackSound) {
+		rl.StopSound(attackSound)
+	}
+	if damageSoundLoaded && rl.IsSoundPlaying(damageSound) {
+		rl.StopSound(damageSound)
+	}
+
+	Cam.Target = rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset))
 
 	UpdateHealthBar()
 }
@@ -597,6 +717,18 @@ func playerDirections() {
 func UnloadPlayerTexture() {
 	rl.UnloadTexture(playerSprite)
 	rl.UnloadTexture(healthBarTexture)
+	if attackSoundLoaded {
+		rl.UnloadSound(attackSound)
+		attackSoundLoaded = false
+	}
+	if damageSoundLoaded {
+		rl.UnloadSound(damageSound)
+		damageSoundLoaded = false
+	}
+	if walkingSoundLoaded {
+		rl.UnloadSound(walkingSound)
+		walkingSoundLoaded = false
+	}
 }
 
 func SetExternalColliders(rects []rl.Rectangle) {
