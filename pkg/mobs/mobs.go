@@ -93,7 +93,6 @@ func SpawnMobs(amount int, mobType string) int {
 		return len(mobs)
 	}
 
-	// helper to choose a texture by type
 	selectMobTexture := func(t string) rl.Texture2D {
 		switch t {
 		case "bat":
@@ -115,7 +114,6 @@ func SpawnMobs(amount int, mobType string) int {
 		x := float32(selectedTile.X * world.WorldMap.TileSize)
 		y := float32(selectedTile.Y * world.WorldMap.TileSize)
 
-		// choose per-mob type when random, otherwise use provided type
 		chosenType := mobType
 		if mobType == "random" {
 			chosenType = defaultMobTypes[rand.Intn(len(defaultMobTypes))]
@@ -152,7 +150,6 @@ func SpawnMobsAtPositions(positions []rl.Vector2, mobType string) int {
 		return len(mobs)
 	}
 
-	// helper to choose a texture by type
 	selectMobTexture := func(t string) rl.Texture2D {
 		switch t {
 		case "bat":
@@ -202,7 +199,6 @@ func SpawnMobsAtPositions(positions []rl.Vector2, mobType string) int {
 func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 	globalFrameCount++
 
-	// If using dungeon colliders, keep a flow field toward the player updated
 	if len(externalColliders) > 0 {
 		ensureFlowGrid()
 		if flowDirty || globalFrameCount-lastFlowCalcFrame >= flowRecalcInterval {
@@ -295,7 +291,6 @@ func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 					directionX := playerPos.X - mobs[i].Dest.X
 					directionY := playerPos.Y - mobs[i].Dest.Y
 
-					// If flow field exists (dungeon), prefer its direction
 					if len(externalColliders) > 0 {
 						fx, fy, ok := sampleFlowAt(mobs[i].Dest.X, mobs[i].Dest.Y)
 						if ok {
@@ -335,7 +330,6 @@ func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 
 					moveSpeed := float32(0.6)
 
-					// move in two smaller half-steps to reduce tunneling into thin colliders
 					stepX := directionX * (moveSpeed / 2)
 					stepY := directionY * (moveSpeed / 2)
 					mobs[i].Dest.X += stepX

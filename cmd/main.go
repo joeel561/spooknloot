@@ -7,6 +7,7 @@ import (
 	"spooknloot/pkg/dungeon"
 	"spooknloot/pkg/mobs"
 	"spooknloot/pkg/player"
+	"spooknloot/pkg/ui"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -29,6 +30,9 @@ var (
 	bossMusic    rl.Music
 	currentMusic string
 	printDebug   bool
+
+	menuOpen        bool = true
+	menuPausedMusic bool
 
 	inDungeon           bool
 	inBoss              bool
@@ -122,6 +126,8 @@ func init() {
 	printDebug = false
 
 	playTrack("world")
+
+	ui.InitMenu("assets/ui/map.png")
 }
 
 func input() {
@@ -138,20 +144,36 @@ func input() {
 		}
 	}
 
-	player.PlayerInput()
+	if menuOpen {
+		if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyEscape) {
+			menuOpen = false
+			if menuPausedMusic {
+				resumeCurrentMusic()
+				menuPausedMusic = false
+			}
+		}
+	} else {
+		if rl.IsKeyPressed(rl.KeyEscape) {
+			menuOpen = true
+			if !musicPaused {
+				pauseCurrentMusic()
+				menuPausedMusic = true
+			}
+		}
+	}
+
+	if !menuOpen {
+		player.PlayerInput()
+	}
 
 	if rl.IsKeyPressed(rl.KeyF3) {
 		printDebug = !printDebug
 	}
 
-	if rl.IsKeyPressed(rl.KeyEscape) {
-		running = false
-	}
-
-	if inDungeon && rl.IsKeyPressed(rl.KeyBackspace) {
+	if !menuOpen && inDungeon && rl.IsKeyPressed(rl.KeyBackspace) {
 		exitDungeon()
 	}
-	if inBoss && rl.IsKeyPressed(rl.KeyBackspace) {
+	if !menuOpen && inBoss && rl.IsKeyPressed(rl.KeyBackspace) {
 		exitBoss()
 	}
 }
@@ -160,6 +182,10 @@ func update() {
 	running = !rl.WindowShouldClose()
 
 	updateCurrentMusic()
+
+	if menuOpen {
+		return
+	}
 
 	if !inDungeon && !inBoss {
 		world.LightLamps()
@@ -263,6 +289,10 @@ func render() {
 		debug.DrawDebug(debug.DebugText())
 	}
 
+	if menuOpen {
+		ui.DrawMenuOverlay()
+	}
+
 	rl.EndDrawing()
 }
 
@@ -284,6 +314,7 @@ func quit() {
 	world.UnloadPumpkinLamps()
 	mobs.UnloadMobsTexture()
 	dungeon.Unload()
+	ui.UnloadMenu()
 
 	rl.CloseWindow()
 }
