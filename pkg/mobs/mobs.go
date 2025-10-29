@@ -42,16 +42,16 @@ var (
 	externalColliders []rl.Rectangle
 	skeletonSprite1   rl.Texture2D
 	skeletonSprite2   rl.Texture2D
+	skeletonSprite3   rl.Texture2D
 	zombieSprite      rl.Texture2D
-	defaultMobTypes   = []string{"bat", "skeleton1", "skeleton2", "zombie"}
+	defaultMobTypes   = []string{"bat", "skeleton1", "skeleton2", "skeleton3", "zombie"}
 
-	// Flow field state (used in dungeon when externalColliders are set)
 	flowField          [][]rl.Vector2
 	flowBlocked        [][]bool
 	flowW, flowH       int
 	flowTileSize       int
 	flowDirty          bool
-	flowRecalcInterval int = 6 // frames between recomputations
+	flowRecalcInterval int = 6
 	lastFlowCalcFrame  int
 )
 
@@ -85,7 +85,7 @@ func InitMobs() {
 	skeletonSprite1 = rl.LoadTexture("assets/mobs/skeleton_1.png")
 	skeletonSprite2 = rl.LoadTexture("assets/mobs/skeleton_2.png")
 	zombieSprite = rl.LoadTexture("assets/mobs/zombie.png")
-
+	skeletonSprite3 = rl.LoadTexture("assets/mobs/skeleton_3.png")
 }
 
 func SpawnMobs(amount int, mobType string) int {
@@ -101,6 +101,8 @@ func SpawnMobs(amount int, mobType string) int {
 			return skeletonSprite1
 		case "skeleton2":
 			return skeletonSprite2
+		case "skeleton3":
+			return skeletonSprite3
 		case "zombie":
 			return zombieSprite
 		default:
@@ -158,6 +160,8 @@ func SpawnMobsAtPositions(positions []rl.Vector2, mobType string) int {
 			return skeletonSprite1
 		case "skeleton2":
 			return skeletonSprite2
+		case "skeleton3":
+			return skeletonSprite3
 		case "zombie":
 			return zombieSprite
 		default:

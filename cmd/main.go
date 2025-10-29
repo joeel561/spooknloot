@@ -218,6 +218,8 @@ func update() {
 	}
 	if inDungeon {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
+		// Potion pickup check in dungeon
+		dungeon.UpdatePotionPickup(player.PlayerHitBox)
 	} else if !inBoss {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
 	}

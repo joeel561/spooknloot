@@ -30,15 +30,17 @@ func (r Room) Intersects(o Room) bool {
 }
 
 var (
-	tiles          [][]int
-	dungeonTexture rl.Texture2D
-	tileSrc        rl.Rectangle
-	tileDest       rl.Rectangle
-	spawnPx        rl.Vector2
-	exitPx         rl.Rectangle
-	colliders      []rl.Rectangle
-	initialized    bool
-	exitVisible    bool
+	tiles             [][]int
+	dungeonTexture    rl.Texture2D
+	dungeonAddTexture rl.Texture2D
+	torchFrontTexture rl.Texture2D
+	tileSrc           rl.Rectangle
+	tileDest          rl.Rectangle
+	spawnPx           rl.Vector2
+	exitPx            rl.Rectangle
+	colliders         []rl.Rectangle
+	initialized       bool
+	exitVisible       bool
 )
 
 // Tile indices mapping for spritesheet:
@@ -50,6 +52,11 @@ func Init() {
 	}
 	dungeonTexture = rl.LoadTexture("assets/dungeon/spritesheet.png")
 	rl.SetTextureFilter(dungeonTexture, rl.FilterPoint)
+	dungeonAddTexture = rl.LoadTexture("assets/dungeon/dungeon_add.png")
+	rl.SetTextureFilter(dungeonAddTexture, rl.FilterPoint)
+	torchFrontTexture = rl.LoadTexture("assets/dungeon/torch_front.png")
+	rl.SetTextureFilter(torchFrontTexture, rl.FilterPoint)
+	initPotion()
 	tileSrc = rl.NewRectangle(0, 0, tileSize, tileSize)
 	tileDest = rl.NewRectangle(0, 0, tileSize, tileSize)
 	initialized = true
@@ -58,6 +65,9 @@ func Init() {
 func Unload() {
 	if initialized {
 		rl.UnloadTexture(dungeonTexture)
+		rl.UnloadTexture(dungeonAddTexture)
+		rl.UnloadTexture(torchFrontTexture)
+		unloadPotion()
 		initialized = false
 	}
 }
@@ -149,6 +159,16 @@ func Generate() {
 			}
 		}
 	}
+
+	// Generate decorative floor overlays for each room (max 7 per room)
+	generateRoomFloorOverlays(rooms)
+
+	// Generate torch decorations on walls per room (max 7 per room)
+	generateRoomWallTorches(rooms)
+
+	// Spawn one potion per level on a random floor tile
+	resetPotion()
+	spawnPotion()
 }
 
 func carveCorridor(x1, y1, x2, y2 int) {
@@ -293,6 +313,15 @@ func Draw() {
 			rl.DrawTexturePro(tex, tileSrc, tileDest, rl.NewVector2(0, 0), 0, rl.White)
 		}
 	}
+
+	// Draw decorative floor overlays after base tiles
+	drawFloorOverlays()
+
+	// Draw items and props
+	drawPotion()
+
+	// Draw wall torches on top of base tiles
+	drawWallTorches()
 }
 
 func GetColliders() []rl.Rectangle {
@@ -350,4 +379,87 @@ func HideExit() {
 
 func IsExitVisible() bool {
 	return exitVisible
+}
+
+type floorOverlay struct {
+	x    int
+	y    int
+	tile int // 0..3 index into dungeon_add sprites
+}
+
+var floorOverlays []floorOverlay
+
+func generateRoomFloorOverlays(rooms []Room) {
+	floorOverlays = floorOverlays[:0]
+	if len(rooms) == 0 {
+		return
+	}
+
+	spawnTileX := int(spawnPx.X) / tileSize
+	spawnTileY := int(spawnPx.Y) / tileSize
+
+	for _, r := range rooms {
+		// Collect candidate floor tiles inside this room
+		candidates := make([][2]int, 0, r.W*r.H)
+		for y := r.Y; y < r.Y+r.H; y++ {
+			for x := r.X; x < r.X+r.W; x++ {
+				if tiles[y][x] == 0 { // floor only
+					if x == spawnTileX && y == spawnTileY {
+						continue // avoid spawn tile
+					}
+					candidates = append(candidates, [2]int{x, y})
+				}
+			}
+		}
+		if len(candidates) == 0 {
+			continue
+		}
+
+		rand.Shuffle(len(candidates), func(i, j int) { candidates[i], candidates[j] = candidates[j], candidates[i] })
+		count := 7
+		if count > len(candidates) {
+			count = len(candidates)
+		}
+
+		// Prepare shuffled tile order (0..3), reshuffle when exhausted to keep variety
+		base := []int{0, 1, 2, 3}
+		rand.Shuffle(len(base), func(i, j int) { base[i], base[j] = base[j], base[i] })
+		idx := 0
+
+		for i := 0; i < count; i++ {
+			pos := candidates[i]
+
+			// Pick tile ensuring variety across placements
+			tile := base[idx]
+			idx++
+			if idx == len(base) {
+				prev := base[len(base)-1]
+				rand.Shuffle(len(base), func(i, j int) { base[i], base[j] = base[j], base[i] })
+				if len(base) > 1 && base[0] == prev {
+					base[0], base[1] = base[1], base[0]
+				}
+				idx = 0
+			}
+
+			floorOverlays = append(floorOverlays, floorOverlay{x: pos[0], y: pos[1], tile: tile})
+		}
+	}
+}
+
+func drawFloorOverlays() {
+	if len(floorOverlays) == 0 {
+		return
+	}
+	tex := dungeonAddTexture
+	if tex.ID == 0 {
+		return
+	}
+	cols := tex.Width / int32(tileSize)
+	for _, ov := range floorOverlays {
+		tileDest.X = float32(ov.x * tileSize)
+		tileDest.Y = float32(ov.y * tileSize)
+		sx := float32(tileSize) * float32((ov.tile)%int(cols))
+		sy := float32(tileSize) * float32((ov.tile)/int(cols))
+		rl.DrawTexturePro(tex, rl.NewRectangle(sx, sy, tileSize, tileSize), tileDest, rl.NewVector2(0, 0), 0, rl.White)
+	}
 }
