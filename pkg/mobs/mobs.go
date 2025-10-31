@@ -201,10 +201,6 @@ func SpawnMobsAtPositions(positions []rl.Vector2, mobType string) int {
 	return len(mobs)
 }
 
-// SpawnBossAtPosition spawns a single boss mob using a 64x64 sprite with large health.
-// Returns the mob index.
-// Boss-specific functions moved to boss.go
-
 func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 	globalFrameCount++
 
@@ -437,7 +433,7 @@ func mobHitboxCollidesWithRects(hit rl.Rectangle, rects []rl.Rectangle) bool {
 
 func mobCollidesAny(mobIndex int) bool {
 	if len(externalColliders) > 0 {
-		return mobHitboxCollidesWithRects(mobs[mobIndex].HitBox, externalColliders)
+		return false
 	}
 	if mobHitboxCollidesWithTiles(mobs[mobIndex].HitBox, world.Bushes) {
 		return true
@@ -625,7 +621,7 @@ func DamageMob(mobIndex int, damage float32) {
 	wasAlive := mobs[mobIndex].Health > 0
 
 	if mobIndex == bossIndex {
-		damage *= 0.5
+		damage *= 0.3
 	}
 	mobs[mobIndex].Health -= damage
 	if mobs[mobIndex].Health < 0 {

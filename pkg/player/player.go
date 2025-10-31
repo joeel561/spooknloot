@@ -10,7 +10,7 @@ import (
 const (
 	screenWidth          = 1500
 	screenHeight         = 900
-	camYOffset   float32 = 2
+	camYOffset   float32 = 1
 )
 
 var (
@@ -43,8 +43,8 @@ var (
 
 	healthBarTexture rl.Texture2D
 	healthBarScale   float32 = 4
-	maxHealth        float32 = 10.0
-	currentHealth    float32 = 10.0
+	maxHealth        float32 = 20.0
+	currentHealth    float32 = 20.0
 	healthbarDir     int     = 0
 	healthBarSrc     rl.Rectangle
 
@@ -126,8 +126,12 @@ func InitPlayer() {
 	PlayerDest = rl.NewRectangle(495, 344, 48, 48)
 	PlayerHitBox = rl.NewRectangle(0, 0, 6, 6)
 
-	Cam = rl.NewCamera2D(rl.NewVector2(float32(screenWidth/2), float32(screenHeight/2)),
-		rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset)), 0, 4)
+	Cam = rl.NewCamera2D(
+		rl.NewVector2(float32(rl.GetScreenWidth()/2), float32(rl.GetScreenHeight()/2)),
+		rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset)),
+		0,
+		4,
+	)
 
 	if _, err := os.Stat("assets/audio/attack.mp3"); err == nil {
 		attackSound = rl.LoadSound("assets/audio/attack.mp3")
@@ -215,7 +219,7 @@ func TryAttack(targetPos rl.Vector2, attackFunc func(float32)) bool {
 
 		dist := rl.Vector2Distance(playerCenter, targetPos)
 		if dist <= attackRange {
-			attackFunc(1.2)
+			attackFunc(2.5)
 			attackHasHit = true
 			attackTimer = attackDuration
 			playerAttack = false
@@ -496,6 +500,8 @@ func PlayerMoving() {
 		}
 	}
 
+	// Keep camera offset centered on current window size every frame (important after fullscreen toggle)
+	Cam.Offset = rl.NewVector2(float32(rl.GetScreenWidth()/2), float32(rl.GetScreenHeight()/2))
 	Cam.Target = rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset))
 
 	PlayerMove, playerJumping = false, false
@@ -668,6 +674,7 @@ func ResetPlayer() {
 		rl.StopSound(damageSound)
 	}
 
+	Cam.Offset = rl.NewVector2(float32(rl.GetScreenWidth()/2), float32(rl.GetScreenHeight()/2))
 	Cam.Target = rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset))
 
 	UpdateHealthBar()
@@ -731,5 +738,7 @@ func ClearExternalColliders() {
 func SetPosition(x, y float32) {
 	PlayerDest.X = x
 	PlayerDest.Y = y
-	Cam.Target = rl.NewVector2(float32(PlayerDest.X-(PlayerDest.Width/2)), float32(PlayerDest.Y-(PlayerDest.Height/2)))
+	// Ensure camera follows player center consistently with Y offset
+	Cam.Offset = rl.NewVector2(float32(rl.GetScreenWidth()/2), float32(rl.GetScreenHeight()/2))
+	Cam.Target = rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset))
 }

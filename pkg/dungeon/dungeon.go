@@ -162,19 +162,37 @@ func Generate() {
 }
 
 func carveCorridor(x1, y1, x2, y2 int) {
+	// Carve a corridor that is 2 tiles wide.
+	// We thicken the path by carving the primary line and the adjacent tile to the
+	// positive axis direction (right for vertical corridors, down for horizontal).
+	// Bounds checks prevent writing outside the map.
+	inBounds := func(x, y int) bool { return x >= 0 && y >= 0 && x < mapW && y < mapH }
+
 	if x1 == x2 {
+		// Vertical corridor at column x1 from y1..y2
 		if y1 > y2 {
 			y1, y2 = y2, y1
 		}
 		for y := y1; y <= y2; y++ {
-			tiles[y][x1] = 0
+			if inBounds(x1, y) {
+				tiles[y][x1] = 0
+			}
+			if inBounds(x1+1, y) {
+				tiles[y][x1+1] = 0
+			}
 		}
 	} else if y1 == y2 {
+		// Horizontal corridor at row y1 from x1..x2
 		if x1 > x2 {
 			x1, x2 = x2, x1
 		}
 		for x := x1; x <= x2; x++ {
-			tiles[y1][x] = 0
+			if inBounds(x, y1) {
+				tiles[y1][x] = 0
+			}
+			if inBounds(x, y1+1) {
+				tiles[y1+1][x] = 0
+			}
 		}
 	}
 }

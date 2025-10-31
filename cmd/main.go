@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	assetpack "spooknloot"
 	"spooknloot/pkg/boss"
 	"spooknloot/pkg/debug"
 	"spooknloot/pkg/dungeon"
@@ -80,6 +81,11 @@ func drawScene() {
 
 func init() {
 
+	// Prepare embedded assets (for single-file distribution). This extracts
+	// assets to a temporary directory and switches CWD so existing relative
+	// file paths continue to work unchanged.
+	_, _, _ = assetpack.Prepare()
+
 	monitor := rl.GetCurrentMonitor()
 	monW := rl.GetMonitorWidth(monitor)
 	monH := rl.GetMonitorHeight(monitor)
@@ -94,6 +100,7 @@ func init() {
 	}
 
 	rl.InitWindow(winW, winH, "spook 'n loot - a game by joeel56")
+
 	rl.SetExitKey(0)
 	rl.SetTargetFPS(60)
 
@@ -275,7 +282,7 @@ func update() {
 
 		if exitCooldownFrames <= 0 && !mobs.IsMobAlive() && dungeon.IsPlayerAtExit(player.PlayerHitBox) {
 			dungeonsCleared++
-			if dungeonsCleared >= 2 {
+			if dungeonsCleared >= 20 {
 				enterBoss()
 			} else {
 				nextDungeon()
