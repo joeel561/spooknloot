@@ -44,11 +44,14 @@ var (
 	dungeonSpawnBaseMax int = 10
 	exitSoundPlayed     bool
 	mobsClearFrames     int
+
+	bossWinOpen bool
 )
 
 func drawScene() {
 	if inBoss {
 		boss.Draw()
+		mobs.DrawMobs()
 	} else if inDungeon {
 		dungeon.Draw()
 		mobs.DrawMobs()
@@ -62,7 +65,7 @@ func drawScene() {
 
 	player.DrawPlayerTexture()
 
-	if !inDungeon {
+	if !inDungeon && !inBoss {
 		world.DrawWheat()
 		world.DrawTopLamp()
 		world.DrawCauldron()
@@ -152,7 +155,7 @@ func input() {
 				menuPausedMusic = false
 			}
 		}
-	} else {
+	} else if !bossWinOpen {
 		if rl.IsKeyPressed(rl.KeyEscape) {
 			menuOpen = true
 			if !musicPaused {
@@ -162,19 +165,25 @@ func input() {
 		}
 	}
 
+	if bossWinOpen {
+		if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
+			mp := rl.GetMousePosition()
+			b := ui.GetBossWinButtonRect()
+			if mp.X >= b.X && mp.X <= b.X+b.Width && mp.Y >= b.Y && mp.Y <= b.Y+b.Height {
+
+				mobs.ResetMobs()
+				bossWinOpen = false
+			}
+		}
+		return
+	}
+
 	if !menuOpen {
 		player.PlayerInput()
 	}
 
 	if rl.IsKeyPressed(rl.KeyF3) {
 		printDebug = !printDebug
-	}
-
-	if !menuOpen && inDungeon && rl.IsKeyPressed(rl.KeyBackspace) {
-		exitDungeon()
-	}
-	if !menuOpen && inBoss && rl.IsKeyPressed(rl.KeyBackspace) {
-		exitBoss()
 	}
 }
 
@@ -211,17 +220,23 @@ func update() {
 
 	player.PlayerMoving()
 
-	playerPos := rl.NewVector2(player.PlayerHitBox.X, player.PlayerHitBox.Y)
+	// Use player's hitbox center for accurate interactions
+	playerPos := rl.NewVector2(player.PlayerHitBox.X+(player.PlayerHitBox.Width/2), player.PlayerHitBox.Y+(player.PlayerHitBox.Height/2))
 	attackPlayerFunc := func() {
 		player.SetPlayerDamageState()
-		player.TakeDamage(0.1)
+		player.TakeDamage(0.2)
 	}
 	if inDungeon {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
-		// Potion pickup check in dungeon
 		dungeon.UpdatePotionPickup(player.PlayerHitBox)
 	} else if !inBoss {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
+	} else if inBoss {
+		attackPlayerFuncBoss := func() {
+			player.SetPlayerDamageState()
+			player.TakeDamage(0.7)
+		}
+		mobs.MobMoving(playerPos, attackPlayerFuncBoss)
 	}
 
 	if mobs.IsMobAlive() {
@@ -260,14 +275,18 @@ func update() {
 
 		if exitCooldownFrames <= 0 && !mobs.IsMobAlive() && dungeon.IsPlayerAtExit(player.PlayerHitBox) {
 			dungeonsCleared++
-			if dungeonsCleared >= 5 {
+			if dungeonsCleared >= 2 {
 				enterBoss()
 			} else {
 				nextDungeon()
 			}
 		}
 	} else if inBoss {
-		// boss room update hooks could go here
+
+		if !mobs.IsBossAlive() {
+			exitBoss()
+			bossWinOpen = true
+		}
 	}
 }
 
@@ -286,6 +305,33 @@ func render() {
 	rl.EndMode2D()
 
 	player.DrawHealthBar()
+
+	if bossWinOpen {
+		ui.DrawBossWinOverlay()
+	}
+
+	if inBoss && mobs.IsBossAlive() {
+		if current, max, ok := mobs.GetBossHealth(); ok && max > 0 {
+			percent := current / max
+			if percent < 0 {
+				percent = 0
+			}
+			barW := float32(480)
+			barH := float32(20)
+			barX := float32(screenWidth)/2 - barW/2
+			barY := float32(16)
+			bg := rl.NewRectangle(barX, barY, barW, barH)
+			fg := rl.NewRectangle(barX+2, barY+2, (barW-4)*percent, barH-4)
+			rl.DrawRectangleRec(bg, rl.NewColor(0, 0, 0, 200))
+			color := rl.Color{R: 190, G: 75, B: 75, A: 255}
+			if percent <= 0.2 {
+				color = rl.Color{R: 57, G: 108, B: 60, A: 255}
+			} else if percent <= 0.5 {
+				color = rl.Color{R: 231, G: 152, B: 50, A: 255}
+			}
+			rl.DrawRectangleRec(fg, color)
+		}
+	}
 
 	if printDebug {
 		debug.DrawDebug(debug.DebugText())
@@ -518,9 +564,13 @@ func enterBoss() {
 	inDungeon = false
 	inBoss = true
 
-	player.ClearExternalColliders()
+	player.SetExternalColliders(boss.GetColliders())
+	mobs.SetExternalColliders(boss.GetColliders())
 	spawn := boss.GetSpawnPosition()
 	player.SetPosition(spawn.X, spawn.Y)
+
+	mobs.ResetMobs()
+	mobs.SpawnBossAtPosition(spawn)
 
 	playTrack("boss")
 }
@@ -532,5 +582,7 @@ func exitBoss() {
 	inBoss = false
 
 	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
+	player.ClearExternalColliders()
+	mobs.ClearExternalColliders()
 	playTrack("world")
 }

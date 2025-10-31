@@ -128,27 +128,22 @@ func Generate() {
 		rooms = append(rooms, newRoom)
 	}
 
-	// Determine spawn at first room center, exit at last room center
 	if len(rooms) > 0 {
 		sx, sy := rooms[0].Center()
 		spawnPx = rl.NewVector2(float32(sx*tileSize), float32(sy*tileSize))
 
 		ex, ey := rooms[len(rooms)-1].Center()
 		exitPx = rl.NewRectangle(float32(ex*tileSize), float32(ey*tileSize), tileSize, tileSize)
-		// mark exit with dedicated sprite index 9 (non-colliding)
 		tiles[ey][ex] = 9
 	} else {
 		spawnPx = rl.NewVector2(float32(2*tileSize), float32(2*tileSize))
 		exitPx = rl.NewRectangle(float32((mapW-3)*tileSize), float32((mapH-3)*tileSize), tileSize, tileSize)
 	}
 
-	// Exit starts hidden until all mobs are cleared
 	exitVisible = false
 
-	// Classify walls and corners using provided indices
 	classifyCorners()
 
-	// Build colliders for any wall tiles (1..8); ignore empty (-1) and exit (9)
 	colliders = colliders[:0]
 	for y := 0; y < mapH; y++ {
 		for x := 0; x < mapW; x++ {
@@ -160,13 +155,8 @@ func Generate() {
 		}
 	}
 
-	// Generate decorative floor overlays for each room (max 7 per room)
 	generateRoomFloorOverlays(rooms)
-
-	// Generate torch decorations on walls per room (max 7 per room)
 	generateRoomWallTorches(rooms)
-
-	// Spawn one potion per level on a random floor tile
 	resetPotion()
 	spawnPotion()
 }
@@ -205,7 +195,7 @@ func classifyCorners() {
 
 	for y := 0; y < mapH; y++ {
 		for x := 0; x < mapW; x++ {
-			// Keep floors and exit as-is
+
 			if original[y][x] == 0 || original[y][x] == 9 {
 				continue
 			}
@@ -221,12 +211,11 @@ func classifyCorners() {
 
 			nearFloor := up || down || left || right || diagUL || diagUR || diagDL || diagDR
 			if !nearFloor {
-				// Far from any walkable area: make empty
+
 				tiles[y][x] = -1
 				continue
 			}
 
-			// Corners first (5..8) — detect diagonal-only adjacency
 			if diagDR && !right && !down {
 				// TL corner: floor at down-right
 				tiles[y][x] = 5
@@ -303,7 +292,6 @@ func Draw() {
 				rl.DrawTexturePro(tex, rl.NewRectangle(floorSrcX, floorSrcY, tileSize, tileSize), tileDest, rl.NewVector2(0, 0), 0, rl.White)
 			}
 
-			// Skip drawing exit sprite if exit is hidden (keep floor only)
 			if t == 9 && !exitVisible {
 				continue
 			}
@@ -314,13 +302,10 @@ func Draw() {
 		}
 	}
 
-	// Draw decorative floor overlays after base tiles
 	drawFloorOverlays()
 
-	// Draw items and props
 	drawPotion()
 
-	// Draw wall torches on top of base tiles
 	drawWallTorches()
 }
 

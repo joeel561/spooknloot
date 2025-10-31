@@ -86,6 +86,7 @@ func InitMobs() {
 	skeletonSprite2 = rl.LoadTexture("assets/mobs/skeleton_2.png")
 	zombieSprite = rl.LoadTexture("assets/mobs/zombie.png")
 	skeletonSprite3 = rl.LoadTexture("assets/mobs/skeleton_3.png")
+	InitBoss()
 }
 
 func SpawnMobs(amount int, mobType string) int {
@@ -200,6 +201,10 @@ func SpawnMobsAtPositions(positions []rl.Vector2, mobType string) int {
 	return len(mobs)
 }
 
+// SpawnBossAtPosition spawns a single boss mob using a 64x64 sprite with large health.
+// Returns the mob index.
+// Boss-specific functions moved to boss.go
+
 func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 	globalFrameCount++
 
@@ -271,9 +276,16 @@ func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 			if mobs[i].DamageTimer > 0 {
 				mobs[i].IsAttacking = false
 			} else {
-				dist := rl.Vector2Distance(rl.NewVector2(mobs[i].Dest.X, mobs[i].Dest.Y), playerPos)
+				// Distance based on hitbox centers for accurate melee range
+				mobCenterX := mobs[i].HitBox.X + (mobs[i].HitBox.Width / 2)
+				mobCenterY := mobs[i].HitBox.Y + (mobs[i].HitBox.Height / 2)
+				dist := rl.Vector2Distance(rl.NewVector2(mobCenterX, mobCenterY), playerPos)
 
-				if dist <= attackRange && globalFrameCount-mobs[i].LastAttack >= attackCooldown && !mobs[i].IsAttacking {
+				currentAttackRange := attackRange
+				if i == bossIndex {
+					currentAttackRange = 48
+				}
+				if dist <= currentAttackRange && globalFrameCount-mobs[i].LastAttack >= attackCooldown && !mobs[i].IsAttacking {
 					mobs[i].LastAttack = globalFrameCount
 					mobs[i].IsAttacking = true
 					mobs[i].AttackTimer = attackDuration
@@ -292,11 +304,13 @@ func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 				}
 
 				if !mobs[i].IsAttacking && dist < 180 && dist > 8 {
-					directionX := playerPos.X - mobs[i].Dest.X
-					directionY := playerPos.Y - mobs[i].Dest.Y
+
+					directionX := playerPos.X - mobCenterX
+					directionY := playerPos.Y - mobCenterY
 
 					if len(externalColliders) > 0 {
-						fx, fy, ok := sampleFlowAt(mobs[i].Dest.X, mobs[i].Dest.Y)
+
+						fx, fy, ok := sampleFlowAt(mobCenterX, mobCenterY)
 						if ok {
 							directionX, directionY = fx, fy
 						}
@@ -333,6 +347,9 @@ func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 					}
 
 					moveSpeed := float32(0.6)
+					if i == bossIndex {
+						moveSpeed = 0.9
+					}
 
 					stepX := directionX * (moveSpeed / 2)
 					stepY := directionY * (moveSpeed / 2)
@@ -561,7 +578,10 @@ func GetClosestMobIndex(playerPos rl.Vector2) int {
 
 	for i := range mobs {
 		if mobs[i].Health > 0 && !mobs[i].IsDead {
-			distance := rl.Vector2Distance(playerPos, rl.NewVector2(mobs[i].Dest.X, mobs[i].Dest.Y))
+			// Use mob hitbox center for accurate closest selection
+			cx := mobs[i].HitBox.X + (mobs[i].HitBox.Width / 2)
+			cy := mobs[i].HitBox.Y + (mobs[i].HitBox.Height / 2)
+			distance := rl.Vector2Distance(playerPos, rl.NewVector2(cx, cy))
 			if distance < closestIndexDistance {
 				closestIndexDistance = distance
 				closestIndex = i
@@ -576,7 +596,7 @@ func DrawMobs() {
 	for i := range mobs {
 		if mobs[i].Health > 0 || mobs[i].IsDead {
 			rl.DrawTexturePro(mobs[i].Sprite, mobs[i].Src, mobs[i].Dest, rl.NewVector2(0, 0), 0, rl.White)
-			if mobs[i].Health > 0 && !mobs[i].IsDead {
+			if mobs[i].Health > 0 && !mobs[i].IsDead && i != bossIndex {
 				DrawMobsHealthBar(i)
 			}
 		}
@@ -604,6 +624,9 @@ func DamageMob(mobIndex int, damage float32) {
 
 	wasAlive := mobs[mobIndex].Health > 0
 
+	if mobIndex == bossIndex {
+		damage *= 0.5
+	}
 	mobs[mobIndex].Health -= damage
 	if mobs[mobIndex].Health < 0 {
 		mobs[mobIndex].Health = 0
@@ -631,6 +654,7 @@ func DamageMob(mobIndex int, damage float32) {
 func ResetMobs() {
 	mobs = []Mob{}
 	globalFrameCount = 0
+	bossIndex = -1
 }
 
 func UnloadMobsTexture() {

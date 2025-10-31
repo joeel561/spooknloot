@@ -13,6 +13,9 @@ var (
 	menuFont         rl.Font
 	menuFontLoaded   bool
 	menuTitleOffsetY float32
+
+	// boss win overlay button rect (computed each frame DrawBossWinOverlay is called)
+	bossWinButtonRect rl.Rectangle
 )
 
 func InitMenu(texturePath string) {
@@ -139,6 +142,74 @@ func DrawMenuOverlay() {
 			y += smallTextBottomSize + lineGap
 		}
 	}
+}
+
+// DrawBossWinOverlay draws a centered message and a button to restart the game.
+// The button rectangle can be queried via GetBossWinButtonRect.
+func DrawBossWinOverlay() {
+	w := rl.GetScreenWidth()
+	h := rl.GetScreenHeight()
+	rl.DrawRectangle(0, 0, int32(w), int32(h), rl.NewColor(0, 0, 0, 220))
+
+	title := "You've succeeded. Congrats! Want another try?"
+	buttonText := "Starte das Spiel neu"
+
+	// Layout
+	titleSize := float32(36)
+	buttonPaddingX := float32(24)
+	buttonPaddingY := float32(10)
+	spacing := float32(0)
+	cx := float32(w) / 2
+	cy := float32(h) / 2
+
+	// Title
+	if menuFontLoaded {
+		tw := rl.MeasureTextEx(menuFont, title, titleSize, spacing)
+		rl.DrawTextEx(menuFont, title, rl.NewVector2(cx-(tw.X/2), cy-60), titleSize, spacing, rl.RayWhite)
+	} else {
+		tw := rl.MeasureText(title, 24)
+		rl.DrawText(title, int32(cx)-tw/2, int32(cy-60), 24, rl.RayWhite)
+	}
+
+	// Button sizing (use default font for simplicity if custom not loaded)
+	var bw, bh float32
+	if menuFontLoaded {
+		sz := float32(24)
+		tw := rl.MeasureTextEx(menuFont, buttonText, sz, 0)
+		bw = tw.X + buttonPaddingX*2
+		bh = sz + buttonPaddingY*2
+	} else {
+		sz := int32(24)
+		tw := float32(rl.MeasureText(buttonText, sz))
+		bw = tw + buttonPaddingX*2
+		bh = float32(sz) + buttonPaddingY*2
+	}
+	bx := cx - (bw / 2)
+	by := cy + 10
+
+	bossWinButtonRect = rl.NewRectangle(bx, by, bw, bh)
+	// Button background
+	rl.DrawRectangleRec(bossWinButtonRect, rl.NewColor(200, 200, 200, 255))
+	rl.DrawRectangleLines(int32(bossWinButtonRect.X), int32(bossWinButtonRect.Y), int32(bossWinButtonRect.Width), int32(bossWinButtonRect.Height), rl.Black)
+
+	// Button label
+	if menuFontLoaded {
+		sz := float32(24)
+		tw := rl.MeasureTextEx(menuFont, buttonText, sz, 0)
+		tx := bossWinButtonRect.X + (bossWinButtonRect.Width-tw.X)/2
+		ty := bossWinButtonRect.Y + (bossWinButtonRect.Height-sz)/2
+		rl.DrawTextEx(menuFont, buttonText, rl.NewVector2(tx, ty), sz, 0, rl.Black)
+	} else {
+		sz := int32(24)
+		tw := rl.MeasureText(buttonText, sz)
+		tx := bossWinButtonRect.X + (bossWinButtonRect.Width-float32(tw))/2
+		ty := bossWinButtonRect.Y + (bossWinButtonRect.Height-float32(sz))/2
+		rl.DrawText(buttonText, int32(tx), int32(ty), sz, rl.Black)
+	}
+}
+
+func GetBossWinButtonRect() rl.Rectangle {
+	return bossWinButtonRect
 }
 
 func max(a, b int) int {

@@ -199,16 +199,16 @@ func PlayerInput() {
 	}
 
 	if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
-		playerAttack = true
-		attackPressed = true
+		if !(rl.IsKeyDown(rl.KeySpace) || rl.IsKeyDown(rl.KeyLeftShift) || rl.IsKeyDown(rl.KeyRightShift)) {
+			playerAttack = true
+			attackPressed = true
+		}
 	}
 }
 
 func TryAttack(targetPos rl.Vector2, attackFunc func(float32)) bool {
 
-	// Deal damage once per swing when in the mid-swing window
 	if attackActive && !attackHasHit {
-		// Use hitbox centers for more accurate melee distance
 		px := PlayerHitBox.X + (PlayerHitBox.Width / 2)
 		py := PlayerHitBox.Y + (PlayerHitBox.Height / 2)
 		playerCenter := rl.NewVector2(px, py)
@@ -216,7 +216,6 @@ func TryAttack(targetPos rl.Vector2, attackFunc func(float32)) bool {
 		dist := rl.Vector2Distance(playerCenter, targetPos)
 		if dist <= attackRange {
 			attackFunc(1.2)
-			// stun mechanic removed
 			attackHasHit = true
 			attackTimer = attackDuration
 			playerAttack = false
@@ -232,7 +231,6 @@ func PlayerMoving() {
 	oldX, oldY = PlayerDest.X, PlayerDest.Y
 	playerSrc.X = playerSrc.Width * float32(playerFrame)
 
-	// Ensure attack sound is stopped if player is dead
 	if IsPlayerDead() {
 		if attackSoundLoaded && rl.IsSoundPlaying(attackSound) {
 			rl.StopSound(attackSound)
@@ -255,7 +253,6 @@ func PlayerMoving() {
 			rl.PlaySound(attackSound)
 		}
 
-		// Stop walking sound immediately on attack start
 		if walkingSoundLoaded && rl.IsSoundPlaying(walkingSound) {
 			rl.StopSound(walkingSound)
 		}
@@ -266,7 +263,6 @@ func PlayerMoving() {
 	}
 
 	if takeDamage {
-		// Enter a short damage state; damage rows have 2 frames → clamp frames to [0,1]
 		if playerFrame >= 2 {
 			playerFrame = 0
 		}
@@ -285,11 +281,9 @@ func PlayerMoving() {
 		playerDamageTimer = 10
 		takeDamage = false
 
-		// Start damage sound on entering damage state
 		if damageSoundLoaded && !rl.IsSoundPlaying(damageSound) {
 			rl.PlaySound(damageSound)
 		}
-		// Stop walking sound while damaged
 		if walkingSoundLoaded && rl.IsSoundPlaying(walkingSound) {
 			rl.StopSound(walkingSound)
 		}
@@ -300,7 +294,6 @@ func PlayerMoving() {
 		if frameCountAttack%4 == 0 {
 			playerFrameAttack++
 		}
-		// Keep attack sound playing only while attacking (restart if it ends mid-swing)
 		if attackSoundLoaded && !rl.IsSoundPlaying(attackSound) {
 			rl.PlaySound(attackSound)
 		}
@@ -398,21 +391,17 @@ func PlayerMoving() {
 			if IsPlayerDead() {
 				playerFrameDead++
 			}
-			// Clamp damage frames to [0,1] while damage is active (damage rows only have 2 frames)
 			if playerDamageTimer > 0 && playerFrame >= 2 {
 				playerFrame = 0
 			}
 
-			// Footstep timing: play on specific animation frames while moving and not attacking/damaged
 			if walkingSoundLoaded && playerDamageTimer == 0 && !attackActive {
-				// Trigger on frames 0 and 2 to mimic left/right steps
 				if playerFrame == 0 || playerFrame == 2 {
 					if frameCount-lastFootstepFrame >= 8 { // minimal gap between steps
 						lastFootstepFrame = frameCount
 						if !rl.IsSoundPlaying(walkingSound) {
 							rl.PlaySound(walkingSound)
 						} else {
-							// Restart quickly to get a crisp step
 							rl.StopSound(walkingSound)
 							rl.PlaySound(walkingSound)
 						}
@@ -433,12 +422,10 @@ func PlayerMoving() {
 	frameCount++
 	if playerDamageTimer > 0 {
 		playerDamageTimer--
-		// Keep damage sound active while damage timer runs
 		if damageSoundLoaded && !rl.IsSoundPlaying(damageSound) {
 			rl.PlaySound(damageSound)
 		}
 	} else {
-		// Stop damage sound when damage state ends
 		if damageSoundLoaded && rl.IsSoundPlaying(damageSound) {
 			rl.StopSound(damageSound)
 		}

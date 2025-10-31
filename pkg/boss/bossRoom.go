@@ -19,6 +19,8 @@ var (
 	Ground         []Tile
 	Props          []Tile
 	Spawn          []Tile
+
+	colliders []rl.Rectangle
 )
 
 type JsonMap struct {
@@ -52,10 +54,12 @@ func LoadMap(mapFile string) {
 	byteValue, _ := ioutil.ReadAll(file)
 
 	json.Unmarshal(byteValue, &BossMap)
+
+	buildColliders()
 }
 
 func Init() {
-	SpritesheetMap = rl.LoadTexture("assets/world/spritesheet.png")
+	SpritesheetMap = rl.LoadTexture("assets/boss/spritesheet.png")
 	tileDest = rl.NewRectangle(0, 0, 16, 16)
 	tileSrc = rl.NewRectangle(0, 0, 16, 16)
 }
@@ -68,24 +72,12 @@ func Draw() {
 		if BossMap.Layers[i].Name == "background" {
 			Background = BossMap.Layers[i].Tiles
 		}
-		if BossMap.Layers[i].Name == "spawn" {
-			Spawn = BossMap.Layers[i].Tiles
-		}
-		if BossMap.Layers[i].Name == "ground" {
-			Ground = BossMap.Layers[i].Tiles
-		}
-		if BossMap.Layers[i].Name == "props" {
-			Props = BossMap.Layers[i].Tiles
-		}
 	}
 
 	rl.DrawTexturePro(tex, tileSrc, tileDest, rl.NewVector2(0, 0), 0, rl.White)
 
 	renderLayer(Out)
-	renderLayer(Spawn)
 	renderLayer(Background)
-	renderLayer(Ground)
-	renderLayer(Props)
 }
 
 func renderLayer(Layer []Tile) {
@@ -116,10 +108,7 @@ func Unload() {
 	rl.UnloadTexture(SpritesheetMap)
 }
 
-// GetSpawnPosition returns the pixel position of the first tile in the
-// "spawn" layer. Falls back to (0,0) if none is present.
 func GetSpawnPosition() rl.Vector2 {
-	// Find spawn layer lazily in the map data
 	for i := 0; i < len(BossMap.Layers); i++ {
 		if BossMap.Layers[i].Name == "spawn" {
 			if len(BossMap.Layers[i].Tiles) > 0 {
@@ -130,4 +119,27 @@ func GetSpawnPosition() rl.Vector2 {
 		}
 	}
 	return rl.NewVector2(0, 0)
+}
+
+// GetColliders returns rectangles for all tiles from layers where Collider=true
+func GetColliders() []rl.Rectangle {
+	return colliders
+}
+
+func buildColliders() {
+	colliders = colliders[:0]
+	if len(BossMap.Layers) == 0 {
+		return
+	}
+	for i := 0; i < len(BossMap.Layers); i++ {
+		layer := BossMap.Layers[i]
+		if !layer.Collider || len(layer.Tiles) == 0 {
+			continue
+		}
+		for j := 0; j < len(layer.Tiles); j++ {
+			t := layer.Tiles[j]
+			r := rl.NewRectangle(float32(t.X*BossMap.TileSize), float32(t.Y*BossMap.TileSize), float32(BossMap.TileSize), float32(BossMap.TileSize))
+			colliders = append(colliders, r)
+		}
+	}
 }
