@@ -16,9 +16,9 @@ var (
 	tex            rl.Texture2D
 	Out            []Tile
 	Background     []Tile
-	Ground         []Tile
-	Props          []Tile
 	Spawn          []Tile
+	Torch          []Tile
+	Decoration     []Tile
 
 	colliders []rl.Rectangle
 )
@@ -66,18 +66,27 @@ func Init() {
 
 func Draw() {
 	for i := 0; i < len(BossMap.Layers); i++ {
-		if BossMap.Layers[i].Name == "out" {
+		if BossMap.Layers[i].Name == "Walls" {
 			Out = BossMap.Layers[i].Tiles
 		}
-		if BossMap.Layers[i].Name == "background" {
+		if BossMap.Layers[i].Name == "Floor" {
 			Background = BossMap.Layers[i].Tiles
+		}
+		if BossMap.Layers[i].Name == "Torch" {
+			Torch = BossMap.Layers[i].Tiles
+		}
+
+		if BossMap.Layers[i].Name == "Decoration" {
+			Decoration = BossMap.Layers[i].Tiles
 		}
 	}
 
 	rl.DrawTexturePro(tex, tileSrc, tileDest, rl.NewVector2(0, 0), 0, rl.White)
 
-	renderLayer(Out)
 	renderLayer(Background)
+	renderLayer(Out)
+	renderLayer(Torch)
+	renderLayer(Decoration)
 }
 
 func renderLayer(Layer []Tile) {
@@ -85,7 +94,6 @@ func renderLayer(Layer []Tile) {
 		tex = SpritesheetMap
 		texColumns := tex.Width / int32(BossMap.TileSize)
 		tileId := int64(0)
-		// parse id to int, map.json uses strings like world
 		for j := 0; j < len(Layer[i].Id); j++ {
 			c := Layer[i].Id[j]
 			if c < '0' || c > '9' {
@@ -108,20 +116,6 @@ func Unload() {
 	rl.UnloadTexture(SpritesheetMap)
 }
 
-func GetSpawnPosition() rl.Vector2 {
-	for i := 0; i < len(BossMap.Layers); i++ {
-		if BossMap.Layers[i].Name == "spawn" {
-			if len(BossMap.Layers[i].Tiles) > 0 {
-				t := BossMap.Layers[i].Tiles[0]
-				return rl.NewVector2(float32(t.X*BossMap.TileSize), float32(t.Y*BossMap.TileSize))
-			}
-			break
-		}
-	}
-	return rl.NewVector2(0, 0)
-}
-
-// GetColliders returns rectangles for all tiles from layers where Collider=true
 func GetColliders() []rl.Rectangle {
 	return colliders
 }

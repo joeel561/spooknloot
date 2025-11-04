@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 
+	"spooknloot/pkg/boss"
 	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -366,21 +367,6 @@ func MobMoving(playerPos rl.Vector2, attackPlayerFunc func()) {
 	}
 }
 
-func MobCollision(mobIndex int, tiles []world.Tile) {
-	var jsonMap = world.WorldMap
-
-	for i := 0; i < len(tiles); i++ {
-		if mobs[mobIndex].HitBox.X < float32(tiles[i].X*jsonMap.TileSize+jsonMap.TileSize) &&
-			mobs[mobIndex].HitBox.X+mobs[mobIndex].HitBox.Width > float32(tiles[i].X*jsonMap.TileSize) &&
-			mobs[mobIndex].HitBox.Y < float32(tiles[i].Y*jsonMap.TileSize+jsonMap.TileSize) &&
-			mobs[mobIndex].HitBox.Y+mobs[mobIndex].HitBox.Height > float32(tiles[i].Y*jsonMap.TileSize) {
-
-			mobs[mobIndex].Dest.X = mobs[mobIndex].OldX
-			mobs[mobIndex].Dest.Y = mobs[mobIndex].OldY
-		}
-	}
-}
-
 func mobCollisionRects(mobIndex int, rects []rl.Rectangle) {
 	if len(rects) == 0 {
 		return
@@ -457,6 +443,17 @@ func mobCollidesAny(mobIndex int) bool {
 	if mobHitboxCollidesWithTiles(mobs[mobIndex].HitBox, world.Lamps) {
 		return true
 	}
+
+	if len(boss.Out) > 0 {
+		bt := make([]world.Tile, 0, len(boss.Out))
+		for _, t := range boss.Out {
+			bt = append(bt, world.Tile{X: t.X, Y: t.Y})
+		}
+		if mobHitboxCollidesWithTiles(mobs[mobIndex].HitBox, bt) {
+			return true
+		}
+	}
+
 	return false
 }
 

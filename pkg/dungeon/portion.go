@@ -48,7 +48,7 @@ func resetPotion() {
 	potionRect = rl.NewRectangle(0, 0, 0, 0)
 }
 
-func spawnPotion() {
+func SpawnPotion() {
 	positions := GetRandomFloorPositions(1)
 	if len(positions) == 0 {
 		resetPotion()

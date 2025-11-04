@@ -145,6 +145,10 @@ func input() {
 		rl.ToggleBorderlessWindowed()
 	}
 
+	if rl.IsKeyPressed(rl.KeyB) {
+		enterBoss()
+	}
+
 	if rl.IsKeyPressed(rl.KeyF7) {
 		musicPaused = !musicPaused
 		if musicPaused {
@@ -227,11 +231,10 @@ func update() {
 
 	player.PlayerMoving()
 
-	// Use player's hitbox center for accurate interactions
 	playerPos := rl.NewVector2(player.PlayerHitBox.X+(player.PlayerHitBox.Width/2), player.PlayerHitBox.Y+(player.PlayerHitBox.Height/2))
 	attackPlayerFunc := func() {
 		player.SetPlayerDamageState()
-		player.TakeDamage(0.2)
+		player.TakeDamage(0.4)
 	}
 	if inDungeon {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
@@ -571,13 +574,17 @@ func enterBoss() {
 	inDungeon = false
 	inBoss = true
 
+	mobs.ResetMobs()
+
 	player.SetExternalColliders(boss.GetColliders())
 	mobs.SetExternalColliders(boss.GetColliders())
-	spawn := boss.GetSpawnPosition()
-	player.SetPosition(spawn.X, spawn.Y)
 
-	mobs.ResetMobs()
-	mobs.SpawnBossAtPosition(spawn)
+	player.SetPosition(548, 285)
+
+	mobs.SpawnMobs(20, "random")
+
+	mobs.SpawnBossAtPosition(rl.NewVector2(548, 200))
+	dungeon.SpawnPotion()
 
 	playTrack("boss")
 }
