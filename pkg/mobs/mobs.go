@@ -90,8 +90,8 @@ func InitMobs() {
 	InitBoss()
 }
 
-func SpawnMobs(amount int, mobType string) int {
-	if len(world.Spawn) == 0 || amount <= 0 {
+func SpawnMobs(amount int, mobType string, tiles []world.Tile) int {
+	if len(tiles) == 0 || amount <= 0 {
 		return len(mobs)
 	}
 
@@ -113,8 +113,8 @@ func SpawnMobs(amount int, mobType string) int {
 	}
 
 	for len(mobs) < amount {
-		randomIndex := rand.Intn(len(world.Spawn))
-		selectedTile := world.Spawn[randomIndex]
+		randomIndex := rand.Intn(len(tiles))
+		selectedTile := tiles[randomIndex]
 		x := float32(selectedTile.X * world.WorldMap.TileSize)
 		y := float32(selectedTile.Y * world.WorldMap.TileSize)
 

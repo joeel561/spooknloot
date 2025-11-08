@@ -53,6 +53,9 @@ func drawScene() {
 	if inBoss {
 		boss.Draw()
 		mobs.DrawMobs()
+		dungeon.DrawPotion()
+		mobs.SpawnMobs(20, "random", boss.FloorTiles)
+		dungeon.SpawnPotions(5, boss.FloorTiles)
 	} else if inDungeon {
 		dungeon.Draw()
 		mobs.DrawMobs()
@@ -70,7 +73,7 @@ func drawScene() {
 		world.DrawWheat()
 		world.DrawTopLamp()
 		world.DrawCauldron()
-		mobs.SpawnMobs(8, "random")
+		mobs.SpawnMobs(8, "random", world.Spawn)
 
 	}
 
@@ -581,10 +584,7 @@ func enterBoss() {
 
 	player.SetPosition(548, 285)
 
-	mobs.SpawnMobs(20, "random")
-
 	mobs.SpawnBossAtPosition(rl.NewVector2(548, 200))
-	dungeon.SpawnPotion()
 
 	playTrack("boss")
 }

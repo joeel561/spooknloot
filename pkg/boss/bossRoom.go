@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"spooknloot/pkg/world"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -14,11 +15,11 @@ var (
 	BossMap        JsonMap
 	SpritesheetMap rl.Texture2D
 	tex            rl.Texture2D
-	Out            []Tile
-	Background     []Tile
-	Spawn          []Tile
-	Torch          []Tile
-	Decoration     []Tile
+	Out            []world.Tile
+	FloorTiles     []world.Tile
+	Spawn          []world.Tile
+	Torch          []world.Tile
+	Decoration     []world.Tile
 
 	colliders []rl.Rectangle
 )
@@ -31,15 +32,9 @@ type JsonMap struct {
 }
 
 type Layer struct {
-	Name     string `json:"name"`
-	Tiles    []Tile `json:"tiles"`
-	Collider bool   `json:"collider"`
-}
-
-type Tile struct {
-	Id string `json:"id"`
-	X  int    `json:"x"`
-	Y  int    `json:"y"`
+	Name     string       `json:"name"`
+	Tiles    []world.Tile `json:"tiles"`
+	Collider bool         `json:"collider"`
 }
 
 func LoadMap(mapFile string) {
@@ -70,7 +65,7 @@ func Draw() {
 			Out = BossMap.Layers[i].Tiles
 		}
 		if BossMap.Layers[i].Name == "Floor" {
-			Background = BossMap.Layers[i].Tiles
+			FloorTiles = BossMap.Layers[i].Tiles
 		}
 		if BossMap.Layers[i].Name == "Torch" {
 			Torch = BossMap.Layers[i].Tiles
@@ -83,13 +78,13 @@ func Draw() {
 
 	rl.DrawTexturePro(tex, tileSrc, tileDest, rl.NewVector2(0, 0), 0, rl.White)
 
-	renderLayer(Background)
+	renderLayer(FloorTiles)
 	renderLayer(Out)
 	renderLayer(Torch)
 	renderLayer(Decoration)
 }
 
-func renderLayer(Layer []Tile) {
+func renderLayer(Layer []world.Tile) {
 	for i := 0; i < len(Layer); i++ {
 		tex = SpritesheetMap
 		texColumns := tex.Width / int32(BossMap.TileSize)

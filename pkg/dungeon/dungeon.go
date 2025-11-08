@@ -322,7 +322,7 @@ func Draw() {
 
 	drawFloorOverlays()
 
-	drawPotion()
+	DrawPotion()
 
 	drawWallTorches()
 }
