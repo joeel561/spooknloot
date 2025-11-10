@@ -55,7 +55,7 @@ func drawScene() {
 		mobs.DrawMobs()
 		dungeon.DrawPotion()
 		mobs.SpawnMobs(20, "random", boss.FloorTiles)
-		dungeon.SpawnPotions(5, boss.FloorTiles)
+		dungeon.SpawnPotions(5, boss.FloorTiles, boss.BossMap.TileSize)
 	} else if inDungeon {
 		dungeon.Draw()
 		mobs.DrawMobs()
@@ -237,7 +237,7 @@ func update() {
 	playerPos := rl.NewVector2(player.PlayerHitBox.X+(player.PlayerHitBox.Width/2), player.PlayerHitBox.Y+(player.PlayerHitBox.Height/2))
 	attackPlayerFunc := func() {
 		player.SetPlayerDamageState()
-		player.TakeDamage(0.4)
+		player.TakeDamage(0.3)
 	}
 	if inDungeon {
 		mobs.MobMoving(playerPos, attackPlayerFunc)
@@ -247,9 +247,10 @@ func update() {
 	} else if inBoss {
 		attackPlayerFuncBoss := func() {
 			player.SetPlayerDamageState()
-			player.TakeDamage(0.7)
+			player.TakeDamage(0.6)
 		}
 		mobs.MobMoving(playerPos, attackPlayerFuncBoss)
+		dungeon.UpdatePotionPickup(player.PlayerHitBox)
 	}
 
 	if mobs.IsMobAlive() {
@@ -595,7 +596,7 @@ func exitBoss() {
 	}
 	inBoss = false
 
-	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
+	player.SetPosition(495, 344)
 	player.ClearExternalColliders()
 	mobs.ClearExternalColliders()
 	playTrack("world")

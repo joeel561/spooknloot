@@ -72,28 +72,33 @@ func SpawnPotion() {
 
 var potions []Potion
 
-func SpawnPotions(amount int, tiles []world.Tile) {
-	if amount <= 0 || len(tiles) == 0 {
-		potions = nil
+func SpawnPotions(amount int, tiles []world.Tile, tileSizePx int) {
+	if amount <= 0 || len(tiles) == 0 || tileSizePx <= 0 {
 		return
 	}
 
-	potions = make([]Potion, 0, amount)
+	// Build a set of already occupied positions to avoid duplicates
+	occupied := make(map[[2]int]struct{}, len(potions))
+	for i := 0; i < len(potions); i++ {
+		key := [2]int{int(potions[i].Position.X), int(potions[i].Position.Y)}
+		occupied[key] = struct{}{}
+	}
 
-	seen := make(map[int]struct{}, len(tiles))
-	for len(potions) < amount && len(seen) < len(tiles) {
+	// Spawn until we reach the requested amount, picking random tiles from the provided list.
+	for len(potions) < amount {
 		idx := rand.Intn(len(tiles))
-		if _, ok := seen[idx]; ok {
+		t := tiles[idx]
+		x := float32(t.X * tileSizePx)
+		y := float32(t.Y * tileSizePx)
+		key := [2]int{int(x), int(y)}
+		if _, exists := occupied[key]; exists {
 			continue
 		}
-		seen[idx] = struct{}{}
-		t := tiles[idx]
-		x := float32(t.X * world.WorldMap.TileSize)
-		y := float32(t.Y * world.WorldMap.TileSize)
 		potions = append(potions, Potion{
 			Position: rl.NewVector2(x, y),
 			Active:   true,
 		})
+		occupied[key] = struct{}{}
 	}
 }
 

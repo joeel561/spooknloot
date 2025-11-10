@@ -618,7 +618,7 @@ func DamageMob(mobIndex int, damage float32) {
 	wasAlive := mobs[mobIndex].Health > 0
 
 	if mobIndex == bossIndex {
-		damage *= 0.3
+		damage *= 0.6
 	}
 	mobs[mobIndex].Health -= damage
 	if mobs[mobIndex].Health < 0 {
