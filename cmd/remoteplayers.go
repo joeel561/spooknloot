@@ -70,7 +70,7 @@ func reviveCandidate() (netcode.PeerID, bool) {
 // updateReviving revives the closest downed teammate while E is held.
 func updateReviving() {
 	target, ok := reviveCandidate()
-	if ok && rl.IsKeyDown(rl.KeyE) {
+	if ok && rl.IsKeyDown(rl.KeyE) && !chatOpen {
 		session.SetReviving(target)
 	} else {
 		session.SetReviving(0)

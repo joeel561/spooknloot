@@ -56,6 +56,7 @@ type Lobby struct {
 	started   bool
 	game      gameState
 	ping      pingState
+	chat      chatState
 	gameInbox []GameMessage
 }
 
@@ -177,8 +178,10 @@ func (l *Lobby) hostHandle(ev netcode.Event) {
 	case netcode.EventConnected:
 		// Wait for the hello before the peer counts as a player.
 	case netcode.EventDisconnected:
+		name := l.PlayerName(ev.Peer)
 		if l.removePlayer(ev.Peer) {
 			l.broadcastState()
+			l.hostSystemChat(name + " left")
 		}
 	case netcode.EventMessage:
 		t, body, err := decode(ev.Data)
@@ -192,6 +195,8 @@ func (l *Lobby) hostHandle(ev netcode.Event) {
 			return
 		}
 		switch t {
+		case msgChat:
+			l.hostReceiveChat(ev.Peer, body)
 		case msgPing:
 			l.hostAnswerPing(ev.Peer, body)
 		case msgPlayerState:
@@ -234,6 +239,7 @@ func (l *Lobby) hostAddPlayer(peer netcode.PeerID, m helloMsg) {
 	l.Players = append(l.Players, Player{ID: peer, Name: l.uniqueName(SanitizeName(m.Name)), Class: class})
 	_ = l.transport.Send(peer, encode(msgWelcome, welcomeMsg{YourID: peer}), true)
 	l.broadcastState()
+	l.hostSystemChat(l.PlayerName(peer) + " joined")
 	// Late joiners go straight into the running game.
 	if l.State == StateInGame {
 		_ = l.transport.Send(peer, encode(msgStartGame, startGameMsg{Seed: l.Seed}), true)
@@ -304,6 +310,8 @@ func (l *Lobby) clientHandle(ev netcode.Event) {
 			return
 		}
 		switch t {
+		case msgChatLine:
+			l.clientReceiveChat(body)
 		case msgPong:
 			l.clientReceivePong(body)
 		case msgPlayerSnapshot:

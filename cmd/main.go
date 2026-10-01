@@ -174,6 +174,10 @@ func input() {
 		}
 	}
 
+	if handleChatKeys() {
+		return // typing a chat message
+	}
+
 	// Title, join and lobby screens handle their own input while drawing.
 	if currentScene != scenePlaying {
 		return
@@ -281,7 +285,7 @@ func render() {
 		}
 		rows := scoreRows()
 		ui.DrawLiveRanking(rows)
-		if rl.IsKeyDown(rl.KeyTab) && !menuOpen {
+		if rl.IsKeyDown(rl.KeyTab) && !menuOpen && !chatOpen {
 			ui.DrawScoreboard(rows)
 		}
 	}
@@ -305,6 +309,7 @@ func render() {
 	}
 
 	drawMenuScreens()
+	drawChatHUD()
 
 	if devFrameHook != nil {
 		devFrameHook()

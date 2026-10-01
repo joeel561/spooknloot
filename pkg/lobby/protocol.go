@@ -10,7 +10,7 @@ import (
 
 // ProtocolVersion must match between host and clients. Bump it whenever a
 // message format changes.
-const ProtocolVersion = "6"
+const ProtocolVersion = "7"
 
 // MsgGameFirst is the first message type reserved for gameplay messages.
 // The lobby passes those through untouched (see Lobby.SendGame).
@@ -28,6 +28,8 @@ const (
 	msgPlayerSnapshot // host -> clients, all states, unreliable
 	msgPing           // client -> host, send time, unreliable
 	msgPong           // host -> client, echoes the ping
+	msgChat           // client -> host: a chat message
+	msgChatLine       // host -> everyone: a chat line to show
 )
 
 // Lobby messages are rare and small, so they are a type byte followed by

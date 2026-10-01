@@ -198,7 +198,8 @@ const (
 )
 
 // DrawLobby draws the lobby: player list plus ready/start/leave buttons.
-func DrawLobby(l *lobby.Lobby) LobbyAction {
+// escape lets Esc leave (false while the chat box uses Esc).
+func DrawLobby(l *lobby.Lobby, escape bool) LobbyAction {
 	dimBackground()
 	cx, cy := screenCenter()
 	panel := rl.NewRectangle(cx-440, cy-380, 880, 760)
@@ -206,7 +207,7 @@ func DrawLobby(l *lobby.Lobby) LobbyAction {
 
 	if l.State == lobby.StateConnecting {
 		drawLabelCentered("Connecting...", cx, cy-40, 40, rl.RayWhite)
-		if button(rl.NewRectangle(cx-100, cy+20, 200, 44), "Cancel", true) || rl.IsKeyPressed(rl.KeyEscape) {
+		if button(rl.NewRectangle(cx-100, cy+20, 200, 44), "Cancel", true) || (escape && rl.IsKeyPressed(rl.KeyEscape)) {
 			return LobbyLeave
 		}
 		return LobbyNone
@@ -265,7 +266,7 @@ func DrawLobby(l *lobby.Lobby) LobbyAction {
 			action = LobbyToggleReady
 		}
 	}
-	if button(rl.NewRectangle(cx+70, by, 220, 50), "Leave", true) || rl.IsKeyPressed(rl.KeyEscape) {
+	if button(rl.NewRectangle(cx+70, by, 220, 50), "Leave", true) || (escape && rl.IsKeyPressed(rl.KeyEscape)) {
 		action = LobbyLeave
 	}
 	return action

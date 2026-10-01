@@ -56,7 +56,7 @@ func drawMenuScreens() {
 		}
 
 	case sceneLobby:
-		switch ui.DrawLobby(gameLobby) {
+		switch ui.DrawLobby(gameLobby, !chatOpen && !chatKeyUsed) {
 		case ui.LobbyToggleReady:
 			me, _ := gameLobby.LocalPlayer()
 			gameLobby.SetReady(!me.Ready)
@@ -118,6 +118,7 @@ func resetGameState() {
 	enterWorld()
 	bossWinOpen = false
 	inventoryOpen = false
+	chatOpen = false
 	toasts = nil
 	menuOpen = false
 	player.ResetPlayer()
