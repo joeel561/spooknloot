@@ -105,3 +105,38 @@ func TestPlayerStateRelay(t *testing.T) {
 	b.Leave()
 	waitFor(t, "b gone", all, func() bool { return len(byID(a)) == 1 && len(byID(host)) == 1 })
 }
+
+func TestPingIsMeasuredAndShared(t *testing.T) {
+	host, err := newHost("Host", "127.0.0.1", testPort+3, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Leave()
+	c := Join(fmt.Sprintf("127.0.0.1:%d", testPort+3), "C")
+	defer c.Leave()
+	all := []*Lobby{host, c}
+	waitFor(t, "lobby", all, func() bool { return c.State == StateInLobby })
+	c.SetReady(true)
+	waitFor(t, "ready", all, host.CanStart)
+	host.Start()
+	waitFor(t, "start", all, func() bool { return c.State == StateInGame })
+
+	if _, ok := host.Ping(); !ok {
+		t.Error("host should report a ping of 0")
+	}
+	waitFor(t, "client ping", all, func() bool { _, ok := c.Ping(); return ok })
+
+	// Pretend a slow connection and check the value reaches the host.
+	c.ping.rtt = 123 * time.Millisecond
+	waitFor(t, "ping shared", all, func() bool {
+		c.SetLocalState(PlayerState{X: 1})
+		host.SetLocalState(PlayerState{})
+		for _, s := range host.LatestStates() {
+			// A real pong may smooth the value down a bit meanwhile.
+			if s.ID == c.LocalID && s.Ping >= 50 {
+				return true
+			}
+		}
+		return false
+	})
+}

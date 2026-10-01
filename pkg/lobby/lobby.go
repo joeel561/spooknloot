@@ -53,6 +53,7 @@ type Lobby struct {
 	dialDone  chan dialResult
 	started   bool
 	game      gameState
+	ping      pingState
 	gameInbox []GameMessage
 }
 
@@ -165,6 +166,7 @@ func (l *Lobby) Update() {
 			return
 		}
 	}
+	l.updatePing()
 	l.updateGame()
 }
 
@@ -188,6 +190,8 @@ func (l *Lobby) hostHandle(ev netcode.Event) {
 			return
 		}
 		switch t {
+		case msgPing:
+			l.hostAnswerPing(ev.Peer, body)
 		case msgPlayerState:
 			l.hostReceiveState(ev.Peer, body)
 		case msgHello:
@@ -294,6 +298,8 @@ func (l *Lobby) clientHandle(ev netcode.Event) {
 			return
 		}
 		switch t {
+		case msgPong:
+			l.clientReceivePong(body)
 		case msgPlayerSnapshot:
 			l.clientReceiveSnapshot(body)
 		case msgWelcome:

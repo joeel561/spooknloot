@@ -256,11 +256,39 @@ func DrawInvite(from string, until time.Time) {
 
 // DrawMultiplayerHUD shows a small lobby info box while playing online.
 func DrawMultiplayerHUD(l *lobby.Lobby) {
-	text := fmt.Sprintf("%s  -  %d players", l.LobbyName, len(l.Players))
+	text := fmt.Sprintf("%s  -  %d players  -  ", l.LobbyName, len(l.Players))
+	ping, color := PingLabel(l)
 	w := rl.MeasureText(text, 18)
-	x := int32(rl.GetScreenWidth()) - w - 24
-	rl.DrawRectangle(x-10, 12, w+20, 30, rl.NewColor(0, 0, 0, 150))
+	pw := rl.MeasureText(ping, 18)
+	x := int32(rl.GetScreenWidth()) - w - pw - 24
+	rl.DrawRectangle(x-10, 12, w+pw+20, 30, rl.NewColor(0, 0, 0, 150))
 	rl.DrawText(text, x, 18, 18, rl.RayWhite)
+	rl.DrawText(ping, x+w, 18, 18, color)
+}
+
+// PingLabel formats the local ping: "host" on the host, otherwise
+// milliseconds colored by quality.
+func PingLabel(l *lobby.Lobby) (string, rl.Color) {
+	if l.IsHost {
+		return "host", accentColor
+	}
+	rtt, ok := l.Ping()
+	if !ok {
+		return "-- ms", mutedTextColor
+	}
+	return PingText(uint16(min(rtt.Milliseconds(), 65535)))
+}
+
+// PingText formats a ping in milliseconds, colored by quality.
+func PingText(ms uint16) (string, rl.Color) {
+	color := readyColor
+	switch {
+	case ms >= 150:
+		color = errorTextColor
+	case ms >= 80:
+		color = accentColor
+	}
+	return fmt.Sprintf("%d ms", ms), color
 }
 
 // DrawRunProgress shows how far the group is on the way to the boss:

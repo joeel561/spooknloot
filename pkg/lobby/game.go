@@ -27,13 +27,14 @@ type PlayerState struct {
 	Dir    uint8
 	Frame  uint8
 	Area   Area
-	Health uint8 // percent of max health
+	Health uint8  // percent of max health
+	Ping   uint16 // round trip to the host in ms (0 for the host)
 }
 
 const (
 	stateSendInterval = 50 * time.Millisecond // 20 Hz
 	maxSamples        = 16
-	playerStateSize   = 4 + 4 + 4 + 1 + 1 + 1 + 1
+	playerStateSize   = 4 + 4 + 4 + 1 + 1 + 1 + 1 + 2
 )
 
 // sample is a received state with its arrival time, used for interpolation.
@@ -85,6 +86,7 @@ type gameState struct {
 // at a fixed rate from Update, so it is fine to call this every frame.
 func (l *Lobby) SetLocalState(s PlayerState) {
 	s.ID = l.LocalID
+	s.Ping = l.pingMillis()
 	l.game.local = s
 	l.game.hasLocal = true
 }
@@ -241,6 +243,7 @@ func encodeStates(t msgType, states []PlayerState) []byte {
 		buf = binary.BigEndian.AppendUint32(buf, math.Float32bits(s.X))
 		buf = binary.BigEndian.AppendUint32(buf, math.Float32bits(s.Y))
 		buf = append(buf, s.Dir, s.Frame, byte(s.Area), s.Health)
+		buf = binary.BigEndian.AppendUint16(buf, s.Ping)
 	}
 	return buf
 }
@@ -271,6 +274,7 @@ func decodeStates(body []byte) ([]PlayerState, error) {
 			Frame:  r[13],
 			Area:   Area(r[14]),
 			Health: r[15],
+			Ping:   binary.BigEndian.Uint16(r[16:]),
 		}
 	}
 	return out, nil
