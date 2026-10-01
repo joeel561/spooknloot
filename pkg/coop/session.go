@@ -35,6 +35,8 @@ const (
 	EventRunComplete
 	// EventRevived: a teammate revived you; heal to Amount of max health.
 	EventRevived
+	// EventLoot: Count items of kind Item went into the inventory.
+	EventLoot
 	// EventWipe: everybody in the run is down, the player is back in the world.
 	EventWipe
 )
@@ -52,6 +54,9 @@ type Event struct {
 	Kind   EventKind
 	Amount float32
 	Spawn  sim.Vec2
+	// Item and Count describe picked up loot (EventLoot).
+	Item  ItemKind
+	Count int
 	// Quiet heals (healer aura) play no potion sound.
 	Quiet bool
 }
@@ -77,6 +82,11 @@ type Session struct {
 	ExitOpen bool
 	Potions  []sim.Vec2
 	Invite   *Invite
+	// Loot on the floor of the current area.
+	Drops []Drop
+	// The local player's inventory, as kept by the host.
+	Gold        int
+	PotionCount int
 	// Statuses holds run members who are not simply alive, by player.
 	Statuses map[PeerID]Status
 
@@ -246,7 +256,7 @@ func (s *Session) SetReviving(target PeerID) {
 
 func (s *Session) toWorld() {
 	s.Area, s.Epoch, s.Level, s.Layout = lobby.AreaWorld, worldEpoch, 0, nil
-	s.ExitOpen, s.Potions = false, nil
+	s.ExitOpen, s.Potions, s.Drops = false, nil, nil
 	s.mobs = map[uint16]*mobTrack{}
 	s.Statuses = map[PeerID]Status{}
 	s.reviveTarget = 0
@@ -265,7 +275,7 @@ func (s *Session) clientHandle(data []byte) {
 		if m.Area == lobby.AreaDungeon {
 			s.Layout = sim.GenerateDungeon(m.Seed)
 		}
-		s.ExitOpen, s.Potions, s.Invite = false, nil, nil
+		s.ExitOpen, s.Potions, s.Invite, s.Drops = false, nil, nil, nil
 		s.mobs = map[uint16]*mobTrack{}
 		// Everyone starts a new area standing; the host sends who is down
 		// to players joining mid-level.
@@ -341,6 +351,10 @@ func (s *Session) clientHandle(data []byte) {
 		if a := r.f32(); r.err == nil {
 			s.events = append(s.events, Event{Kind: EventRevived, Amount: a})
 		}
+	case msgDrops:
+		s.receiveDrops(r)
+	case msgInventory:
+		s.receiveInventory(r)
 	case msgScores:
 		s.receiveScores(r)
 	case msgWipe:

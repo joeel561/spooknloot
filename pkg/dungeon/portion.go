@@ -66,3 +66,18 @@ func PlayDrinkSound() {
 		rl.PlaySound(drinkSound)
 	}
 }
+
+// DrawPotionIcon draws an animated potion into any rectangle (loot on the
+// floor, inventory slots).
+func DrawPotionIcon(dest rl.Rectangle) {
+	if potionTexture.ID == 0 {
+		return
+	}
+	cols := int32(potionTexture.Width) / int32(tileSize)
+	if cols <= 0 {
+		return
+	}
+	frame := int(math.Mod(rl.GetTime()*8.0, 4))
+	src := rl.NewRectangle(float32(tileSize)*float32(frame%int(cols)), float32(tileSize)*float32(frame/int(cols)), tileSize, tileSize)
+	rl.DrawTexturePro(potionTexture, src, dest, rl.NewVector2(0, 0), 0, rl.White)
+}

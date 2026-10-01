@@ -793,6 +793,13 @@ func SetClass(health, reach float32, tint rl.Color) {
 	UpdateHealthBar()
 }
 
+// CancelAttackInput drops an attack started by this frame's click, e.g.
+// when the click was meant for a window.
+func CancelAttackInput() {
+	playerAttack = false
+	attackPressed = false
+}
+
 // idleDirection is the standing pose for the way the player last faced.
 func idleDirection() Direction {
 	switch baseFacing {

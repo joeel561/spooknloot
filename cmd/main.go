@@ -81,6 +81,7 @@ func drawScene() {
 		world.DrawPumpkinLamp()
 	}
 
+	drawDrops()
 	drawRemotePlayers()
 	player.DrawPlayerTexture()
 	drawBolts()
@@ -217,6 +218,15 @@ func input() {
 
 	if !menuOpen {
 		player.PlayerInput()
+		if inventoryOpen {
+			player.CancelAttackInput() // clicks go to the inventory
+		}
+		if rl.IsKeyPressed(rl.KeyI) {
+			inventoryOpen = !inventoryOpen
+		}
+		if rl.IsKeyPressed(rl.KeyOne) && !player.IsPlayerDead() {
+			session.UsePotion()
+		}
 		if rl.IsKeyPressed(rl.KeyJ) && !player.IsPlayerDead() {
 			session.AcceptInvite()
 		}
@@ -265,6 +275,7 @@ func render() {
 			ui.DrawInvite(inv.From, inv.Until)
 		}
 		drawDownedBanner()
+		drawLootHUD()
 		if currentArea() == lobby.AreaDungeon {
 			ui.DrawRunProgress(session.Level, coop.DungeonLevels)
 		}

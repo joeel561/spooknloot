@@ -169,6 +169,8 @@ func handleSessionEvents() {
 			enterArea(ev.Spawn)
 		case coop.EventRevived:
 			player.Revive(ev.Amount * player.GetMaxHealth())
+		case coop.EventLoot:
+			addLootToast(ev.Item, ev.Count)
 		case coop.EventWipe:
 			enterWorld()
 			player.ResetPlayer()

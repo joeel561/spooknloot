@@ -81,7 +81,7 @@ func DrawMenuOverlay() {
 
 	title := "SPOOK 'N LOOT"
 	description := "A game by joeel56\nYour goal is to kill all enemies and reach the exit\n of the dungeon.\nYou have 20 levels and every level gets harder\ntill you reach the boss.\nIf you die you start from the beginning."
-	instructions := "Press ESC to open the menu\nYou can walk with WASD or arrow keys\nAttack the enemies with left click\nYou can pause the music with F7\nF10 to toggle fullscreen\nPress Q in this menu to return to the title screen"
+	instructions := "ESC opens this menu, Q returns to the title screen\nWalk with WASD or arrow keys, attack with left click\nI inventory, 1 drink a potion, Tab scoreboard\nHold E to revive a downed teammate, J to join a run\nF7 pauses the music, F10 toggles fullscreen"
 	smallTextBottom := "Assets by franuka.art"
 	smallTextBottomSize := float32(16)
 	smallTextBottomLines := strings.Split(smallTextBottom, "\n")

@@ -45,6 +45,9 @@ type area struct {
 	exitOpen     bool
 	clearFrames  int
 	respawnTimer int
+	drops        []drop
+	nextDropID   uint16
+	dropsDirty   bool
 	dirty        bool
 }
 
@@ -73,6 +76,8 @@ type host struct {
 	hasLocal   bool
 	lastAttack map[PeerID]int
 	scores     scoreboard
+	// inventories hold every player's items for this game.
+	inventories map[PeerID]*inventory
 	// players is rebuilt every frame: everyone connected and their state.
 	players map[PeerID]*lobby.PlayerState
 }
@@ -218,6 +223,7 @@ func (h *host) updateArea(a *area) {
 			}
 		}
 	}
+	h.updateDrops(a, targets)
 }
 
 func (h *host) updateRunProgress() {
@@ -235,6 +241,7 @@ func (h *host) updateRunProgress() {
 		}
 	case lobby.AreaBoss:
 		if b := a.mobs.Boss(); b == nil || !b.Alive() {
+			h.rewardBoss()
 			for id := range h.run.members {
 				h.s.hostSend(id, newMsg(msgRunComplete).bytes(), true)
 			}
@@ -256,6 +263,10 @@ func (h *host) sendAreas() {
 			for _, id := range members {
 				h.s.hostSend(id, msg, true)
 			}
+		}
+		if a.dropsDirty || h.frame%dropResendEvery == 0 {
+			a.dropsDirty = false
+			h.sendDrops(a, members)
 		}
 		if h.frame%snapshotEvery != 0 {
 			continue
@@ -321,12 +332,15 @@ func (h *host) handle(from PeerID, data []byte) {
 		h.lastAttack[from] = h.frame
 		if a.mobs.Damage(mobID, class.Damage) && m.Dying {
 			h.creditKill(from)
+			h.dropLoot(a, m)
 		}
 	case msgReviveStart:
 		target := PeerID(r.u32())
 		if r.err == nil && h.players[target] != nil {
 			h.handleReviveStart(from, target)
 		}
+	case msgUsePotion:
+		h.handleUsePotion(from)
 	case msgReviveStop:
 		h.handleReviveStop(from)
 	case msgDebugBoss:
@@ -393,6 +407,7 @@ func (h *host) sendEnterArea(id PeerID) {
 		Spawn: a.spawn,
 	}.encode(), true)
 	h.s.hostSend(id, areaState{Epoch: a.epoch, ExitOpen: a.exitOpen, Potions: a.potions}.encode(), true)
+	h.sendDrops(a, []PeerID{id})
 }
 
 func (h *host) nextLevel() {

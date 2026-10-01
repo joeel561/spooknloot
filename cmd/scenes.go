@@ -117,6 +117,8 @@ func resetGameState() {
 	session = nil
 	enterWorld()
 	bossWinOpen = false
+	inventoryOpen = false
+	toasts = nil
 	menuOpen = false
 	player.ResetPlayer()
 }
