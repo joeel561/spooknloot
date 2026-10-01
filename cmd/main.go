@@ -4,6 +4,7 @@ import (
 	"os"
 	assetpack "spooknloot"
 	"spooknloot/pkg/boss"
+	"spooknloot/pkg/coop"
 	"spooknloot/pkg/debug"
 	"spooknloot/pkg/dungeon"
 	"spooknloot/pkg/lobby"
@@ -17,9 +18,8 @@ import (
 )
 
 const (
-	screenWidth               = 1500
-	screenHeight              = 900
-	exitCooldownFramesDefault = 20
+	screenWidth  = 1500
+	screenHeight = 900
 )
 
 var (
@@ -43,17 +43,7 @@ var (
 	statusMessage string
 	lanBrowser    *netcode.Browser
 	gameLobby     *lobby.Lobby
-
-	inDungeon           bool
-	inBoss              bool
-	dungeonsCleared     int
-	savedWorldPos       rl.Vector2
-	exitCooldownFrames  int
-	dungeonSpawnCount   int
-	dungeonSpawnBaseMin int = 5
-	dungeonSpawnBaseMax int = 10
-	exitSoundPlayed     bool
-	mobsClearFrames     int
+	session       *coop.Session
 
 	bossWinOpen bool
 )
@@ -68,32 +58,36 @@ const (
 )
 
 func drawScene() {
-	if inBoss {
+	var mobViews []coop.MobView
+	if session != nil {
+		mobViews = session.Mobs()
+	}
+
+	switch currentArea() {
+	case lobby.AreaBoss:
 		boss.Draw()
-		mobs.DrawMobs()
-		dungeon.DrawPotion()
-		mobs.SpawnMobs(20, "random", boss.FloorTiles)
-		dungeon.SpawnPotions(5, boss.FloorTiles, boss.BossMap.TileSize)
-	} else if inDungeon {
+		mobs.DrawMobs(mobViews)
+		dungeon.DrawPotions(session.Potions)
+	case lobby.AreaDungeon:
+		dungeon.SetExitVisible(session.ExitOpen)
 		dungeon.Draw()
-		mobs.DrawMobs()
-	} else {
+		dungeon.DrawPotions(session.Potions)
+		mobs.DrawMobs(mobViews)
+	default:
 		world.DrawWorld()
 		world.DrawBottomLamp()
 		world.DrawDoors()
-		mobs.DrawMobs()
+		mobs.DrawMobs(mobViews)
 		world.DrawPumpkinLamp()
 	}
 
 	drawRemotePlayers()
 	player.DrawPlayerTexture()
 
-	if !inDungeon && !inBoss {
+	if currentArea() == lobby.AreaWorld {
 		world.DrawWheat()
 		world.DrawTopLamp()
 		world.DrawCauldron()
-		mobs.SpawnMobs(8, "random", world.Spawn)
-
 	}
 
 	if printDebug {
@@ -184,7 +178,7 @@ func input() {
 	}
 
 	if rl.IsKeyPressed(rl.KeyB) {
-		enterBoss()
+		session.DebugBoss()
 	}
 
 	if menuOpen {
@@ -214,8 +208,6 @@ func input() {
 			mp := rl.GetMousePosition()
 			b := ui.GetBossWinButtonRect()
 			if mp.X >= b.X && mp.X <= b.X+b.Width && mp.Y >= b.Y && mp.Y <= b.Y+b.Height {
-
-				mobs.ResetMobs()
 				bossWinOpen = false
 			}
 		}
@@ -224,6 +216,9 @@ func input() {
 
 	if !menuOpen {
 		player.PlayerInput()
+		if rl.IsKeyPressed(rl.KeyJ) && !player.IsPlayerDead() {
+			session.AcceptInvite()
+		}
 	}
 
 	if rl.IsKeyPressed(rl.KeyF3) {
@@ -237,112 +232,20 @@ func update() {
 	updateCurrentMusic()
 	updateLobby()
 
-	if currentScene != scenePlaying || menuOpen {
+	if currentScene != scenePlaying {
 		return
 	}
-
-	if !inDungeon && !inBoss {
-		world.LightLamps()
-		world.LightPumpkinLamps()
-	}
-
-	if player.IsPlayerDead() {
-		player.PlayerMoving()
-		if player.HasPlayerDeathAnimationFinished() {
-			if inDungeon {
-				exitDungeon()
-			} else if inBoss {
-				exitBoss()
-			}
-			dungeonsCleared = 0
-			dungeonSpawnCount = 0
-
-			mobs.ResetMobs()
-			player.ResetPlayer()
-		}
-		return
-	}
-
-	player.PlayerMoving()
-
-	playerPos := rl.NewVector2(player.PlayerHitBox.X+(player.PlayerHitBox.Width/2), player.PlayerHitBox.Y+(player.PlayerHitBox.Height/2))
-	attackPlayerFunc := func() {
-		player.SetPlayerDamageState()
-		player.TakeDamage(0.3)
-	}
-	if inDungeon {
-		mobs.MobMoving(playerPos, attackPlayerFunc)
-		dungeon.UpdatePotionPickup(player.PlayerHitBox)
-	} else if !inBoss {
-		mobs.MobMoving(playerPos, attackPlayerFunc)
-	} else if inBoss {
-		attackPlayerFuncBoss := func() {
-			player.SetPlayerDamageState()
-			player.TakeDamage(0.6)
-		}
-		mobs.MobMoving(playerPos, attackPlayerFuncBoss)
-		dungeon.UpdatePotionPickup(player.PlayerHitBox)
-	}
-
-	if mobs.IsMobAlive() {
-		closestMobIndex := mobs.GetClosestMobIndex(playerPos)
-		if closestMobIndex != -1 {
-			mobCenter := mobs.GetMobHitboxCenterByIndex(closestMobIndex)
-			player.TryAttack(mobCenter, func(damage float32) {
-				mobs.DamageMob(closestMobIndex, damage)
-			})
-		}
-	}
-
-	if !inDungeon && !inBoss {
-		checkEnterDungeon()
-	} else if inDungeon {
-		if exitCooldownFrames > 0 {
-			exitCooldownFrames--
-		}
-
-		if mobs.IsMobAlive() {
-			dungeon.HideExit()
-			exitSoundPlayed = false
-			mobsClearFrames = 0
-		} else {
-			if mobsClearFrames < 6 {
-				mobsClearFrames++
-			}
-			if mobsClearFrames >= 6 {
-				dungeon.ShowExit()
-				if !exitSoundPlayed {
-					world.PlayDoorOpenSound()
-					exitSoundPlayed = true
-				}
-			}
-		}
-
-		if exitCooldownFrames <= 0 && !mobs.IsMobAlive() && dungeon.IsPlayerAtExit(player.PlayerHitBox) {
-			dungeonsCleared++
-			if dungeonsCleared >= 20 {
-				enterBoss()
-			} else {
-				nextDungeon()
-			}
-		}
-	} else if inBoss {
-
-		if !mobs.IsBossAlive() {
-			exitBoss()
-			bossWinOpen = true
-		}
-	}
+	updateGame()
 }
 
 func render() {
 	var cam = player.Cam
 
 	rl.BeginDrawing()
-	if inDungeon || inBoss {
-		rl.ClearBackground(dungeonBgColor)
-	} else {
+	if currentArea() == lobby.AreaWorld {
 		rl.ClearBackground(worldBgColor)
+	} else {
+		rl.ClearBackground(dungeonBgColor)
 	}
 	collectVisibleRemotes()
 	rl.BeginMode2D(cam)
@@ -357,32 +260,18 @@ func render() {
 		if gameLobby != nil {
 			ui.DrawMultiplayerHUD(gameLobby)
 		}
+		if inv := session.Invite; inv != nil && currentArea() == lobby.AreaWorld {
+			ui.DrawInvite(inv.From, inv.Until)
+		}
 	}
 
 	if bossWinOpen {
 		ui.DrawBossWinOverlay()
 	}
 
-	if inBoss && mobs.IsBossAlive() {
-		if current, max, ok := mobs.GetBossHealth(); ok && max > 0 {
-			percent := current / max
-			if percent < 0 {
-				percent = 0
-			}
-			barW := float32(480)
-			barH := float32(20)
-			barX := float32(screenWidth)/2 - barW/2
-			barY := float32(16)
-			bg := rl.NewRectangle(barX, barY, barW, barH)
-			fg := rl.NewRectangle(barX+2, barY+2, (barW-4)*percent, barH-4)
-			rl.DrawRectangleRec(bg, rl.NewColor(0, 0, 0, 200))
-			color := rl.Color{R: 190, G: 75, B: 75, A: 255}
-			if percent <= 0.2 {
-				color = rl.Color{R: 57, G: 108, B: 60, A: 255}
-			} else if percent <= 0.5 {
-				color = rl.Color{R: 231, G: 152, B: 50, A: 255}
-			}
-			rl.DrawRectangleRec(fg, color)
+	if session != nil && currentArea() == lobby.AreaBoss {
+		if health, ok := session.Boss(); ok && health > 0 {
+			drawBossHealthBar(float32(health) / 100)
 		}
 	}
 
@@ -397,6 +286,23 @@ func render() {
 	drawMenuScreens()
 
 	rl.EndDrawing()
+}
+
+func drawBossHealthBar(percent float32) {
+	barW := float32(480)
+	barH := float32(20)
+	barX := float32(rl.GetScreenWidth())/2 - barW/2
+	barY := float32(16)
+	bg := rl.NewRectangle(barX, barY, barW, barH)
+	fg := rl.NewRectangle(barX+2, barY+2, (barW-4)*percent, barH-4)
+	rl.DrawRectangleRec(bg, rl.NewColor(0, 0, 0, 200))
+	color := rl.Color{R: 190, G: 75, B: 75, A: 255}
+	if percent <= 0.2 {
+		color = rl.Color{R: 57, G: 108, B: 60, A: 255}
+	} else if percent <= 0.5 {
+		color = rl.Color{R: 231, G: 152, B: 50, A: 255}
+	}
+	rl.DrawRectangleRec(fg, color)
 }
 
 func quit() {
@@ -529,120 +435,4 @@ func resumeCurrentMusic() {
 			rl.ResumeMusicStream(worldMusic)
 		}
 	}
-}
-
-func checkEnterDungeon() {
-	if player.PlayerHitBox.X < float32(world.HouseDoorDest.X+world.HouseDoorDest.Width) &&
-		player.PlayerHitBox.X+player.PlayerHitBox.Width > float32(world.HouseDoorDest.X) &&
-		player.PlayerHitBox.Y < float32(world.HouseDoorDest.Y+world.HouseDoorDest.Height) &&
-		player.PlayerHitBox.Y+player.PlayerHitBox.Height > float32(world.HouseDoorDest.Y) {
-		enterDungeon()
-	}
-}
-
-func enterDungeon() {
-	if inDungeon {
-		return
-	}
-	inDungeon = true
-	savedWorldPos = rl.NewVector2(player.PlayerDest.X, player.PlayerDest.Y)
-
-	dungeon.Generate()
-	player.SetExternalColliders(dungeon.GetColliders())
-	mobs.SetExternalColliders(dungeon.GetColliders())
-	spawn := dungeon.GetSpawnPosition()
-	player.SetPosition(spawn.X, spawn.Y)
-	exitCooldownFrames = exitCooldownFramesDefault
-
-	baseMin, baseMax := dungeonSpawnBaseMin, dungeonSpawnBaseMax
-	if dungeonSpawnCount == 0 {
-		dungeonSpawnCount = baseMin + int(rl.GetRandomValue(0, int32(baseMax-baseMin)))
-	} else {
-		inc := int(rl.GetRandomValue(2, 5))
-		dungeonSpawnCount += inc
-		if dungeonSpawnCount > baseMax+dungeonSpawnBaseMax {
-			dungeonSpawnCount = baseMax + dungeonSpawnBaseMax
-		}
-	}
-
-	positions := dungeon.GetRandomFloorPositions(dungeonSpawnCount)
-	mobs.ResetMobs()
-	mobs.SpawnMobsAtPositions(positions, "random")
-
-	exitSoundPlayed = false
-	mobsClearFrames = 0
-
-	playTrack("dungeon")
-}
-
-func exitDungeon() {
-	if !inDungeon {
-		return
-	}
-	inDungeon = false
-	player.ClearExternalColliders()
-	mobs.ClearExternalColliders()
-	player.SetPosition(savedWorldPos.X, savedWorldPos.Y)
-	mobs.ResetMobs()
-	playTrack("world")
-}
-
-func nextDungeon() {
-	dungeon.Generate()
-	player.SetExternalColliders(dungeon.GetColliders())
-	mobs.SetExternalColliders(dungeon.GetColliders())
-	spawn := dungeon.GetSpawnPosition()
-	player.SetPosition(spawn.X, spawn.Y)
-	exitCooldownFrames = exitCooldownFramesDefault
-
-	baseMin, baseMax := dungeonSpawnBaseMin, dungeonSpawnBaseMax
-	if dungeonSpawnCount == 0 {
-		dungeonSpawnCount = baseMin + int(rl.GetRandomValue(0, int32(baseMax-baseMin)))
-	} else {
-		inc := int(rl.GetRandomValue(2, 5))
-		dungeonSpawnCount += inc
-		if dungeonSpawnCount > baseMax+dungeonSpawnBaseMax {
-			dungeonSpawnCount = baseMax + dungeonSpawnBaseMax
-		}
-	}
-
-	positions := dungeon.GetRandomFloorPositions(dungeonSpawnCount)
-	mobs.ResetMobs()
-	mobs.SpawnMobsAtPositions(positions, "random")
-
-	exitSoundPlayed = false
-	mobsClearFrames = 0
-
-	playTrack("dungeon")
-}
-
-func enterBoss() {
-	if inBoss {
-		return
-	}
-	inDungeon = false
-	inBoss = true
-
-	mobs.ResetMobs()
-
-	player.SetExternalColliders(boss.GetColliders())
-	mobs.SetExternalColliders(boss.GetColliders())
-
-	player.SetPosition(548, 285)
-
-	mobs.SpawnBossAtPosition(rl.NewVector2(548, 200))
-
-	playTrack("boss")
-}
-
-func exitBoss() {
-	if !inBoss {
-		return
-	}
-	inBoss = false
-
-	player.SetPosition(495, 344)
-	player.ClearExternalColliders()
-	mobs.ClearExternalColliders()
-	playTrack("world")
 }

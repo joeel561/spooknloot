@@ -17,40 +17,15 @@ const remoteInterpolationDelay = 100 * time.Millisecond
 // visibleRemotes holds the other players drawn this frame.
 var visibleRemotes []lobby.PlayerState
 
-func currentArea() lobby.Area {
-	switch {
-	case inBoss:
-		return lobby.AreaBoss
-	case inDungeon:
-		return lobby.AreaDungeon
-	default:
-		return lobby.AreaWorld
-	}
-}
-
-func sendLocalState() {
-	x, y, dir, frame := player.Appearance()
-	health := player.GetCurrentHealth() / player.GetMaxHealth() * 100
-	gameLobby.SetLocalState(lobby.PlayerState{
-		X:      x,
-		Y:      y,
-		Dir:    uint8(dir),
-		Frame:  uint8(frame),
-		Area:   currentArea(),
-		Health: uint8(health),
-	})
-}
-
-// collectVisibleRemotes picks the players to draw this frame. Dungeons and
-// the boss room are still separate per player, so others are only shown
-// in the world for now.
+// collectVisibleRemotes picks the players to draw this frame: everyone in
+// the same area (there is only one dungeon run at a time).
 func collectVisibleRemotes() {
 	visibleRemotes = visibleRemotes[:0]
-	if gameLobby == nil || currentScene != scenePlaying || currentArea() != lobby.AreaWorld {
+	if gameLobby == nil || currentScene != scenePlaying {
 		return
 	}
 	for _, s := range gameLobby.RemoteStates(remoteInterpolationDelay) {
-		if s.Area == lobby.AreaWorld {
+		if s.Area == currentArea() {
 			visibleRemotes = append(visibleRemotes, s)
 		}
 	}

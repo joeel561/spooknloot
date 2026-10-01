@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"math"
+	"time"
 
 	"spooknloot/pkg/lobby"
 	"spooknloot/pkg/netcode"
@@ -232,6 +234,24 @@ func DrawLobby(l *lobby.Lobby) LobbyAction {
 		action = LobbyLeave
 	}
 	return action
+}
+
+// DrawInvite shows "<name> entered the dungeon" with the J hint and the
+// seconds left to join.
+func DrawInvite(from string, until time.Time) {
+	secs := int(math.Ceil(time.Until(until).Seconds()))
+	title := fmt.Sprintf("%s entered the dungeon!", from)
+	hint := fmt.Sprintf("Press J to join (%d)", max(secs, 0))
+	cx := float32(rl.GetScreenWidth()) / 2
+	w := measureLabel(title, 30)
+	if hw := measureLabel(hint, 22); hw > w {
+		w = hw
+	}
+	w += 48
+	box := rl.NewRectangle(cx-w/2, 90, w, 86)
+	drawPanel(box)
+	drawLabelCentered(title, cx, box.Y+12, 30, rl.RayWhite)
+	drawLabelCentered(hint, cx, box.Y+50, 22, accentColor)
 }
 
 // DrawMultiplayerHUD shows a small lobby info box while playing online.

@@ -2,7 +2,6 @@ package main
 
 import (
 	"spooknloot/pkg/lobby"
-	"spooknloot/pkg/mobs"
 	"spooknloot/pkg/netcode"
 	"spooknloot/pkg/player"
 	"spooknloot/pkg/ui"
@@ -76,7 +75,7 @@ func updateLobby() {
 		return
 	}
 	if currentScene == scenePlaying {
-		sendLocalState()
+		gameLobby.SetLocalState(localPlayerState())
 	}
 	gameLobby.Update()
 	if gameLobby.State == lobby.StateClosed {
@@ -88,14 +87,13 @@ func updateLobby() {
 		return
 	}
 	if gameLobby.TakeStarted() {
-		// Every player runs their own local game for now; gameLobby.Seed
-		// is meant for the shared RNG once gameplay is synced.
 		startGame()
 	}
 }
 
 func startGame() {
 	resetGameState()
+	startSession()
 	currentScene = scenePlaying
 }
 
@@ -115,17 +113,10 @@ func returnToTitle(message string) {
 }
 
 func resetGameState() {
-	if inDungeon {
-		exitDungeon()
-	}
-	if inBoss {
-		exitBoss()
-	}
-	dungeonsCleared = 0
-	dungeonSpawnCount = 0
+	session = nil
+	enterWorld()
 	bossWinOpen = false
 	menuOpen = false
-	mobs.ResetMobs()
 	player.ResetPlayer()
 }
 
