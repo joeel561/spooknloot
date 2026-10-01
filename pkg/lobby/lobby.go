@@ -52,6 +52,7 @@ type Lobby struct {
 	announcer *netcode.Announcer
 	dialDone  chan dialResult
 	started   bool
+	game      gameState
 }
 
 type dialResult struct {
@@ -159,6 +160,7 @@ func (l *Lobby) Update() {
 			return
 		}
 	}
+	l.updateGame()
 }
 
 func (l *Lobby) hostHandle(ev netcode.Event) {
@@ -175,6 +177,8 @@ func (l *Lobby) hostHandle(ev netcode.Event) {
 			return
 		}
 		switch t {
+		case msgPlayerState:
+			l.hostReceiveState(ev.Peer, body)
 		case msgHello:
 			var m helloMsg
 			if json.Unmarshal(body, &m) != nil {
@@ -236,6 +240,7 @@ func (l *Lobby) uniqueName(name string) string {
 }
 
 func (l *Lobby) removePlayer(id netcode.PeerID) bool {
+	delete(l.game.remotes, id)
 	for i, p := range l.Players {
 		if p.ID == id {
 			l.Players = append(l.Players[:i], l.Players[i+1:]...)
@@ -274,6 +279,8 @@ func (l *Lobby) clientHandle(ev netcode.Event) {
 			return
 		}
 		switch t {
+		case msgPlayerSnapshot:
+			l.clientReceiveSnapshot(body)
 		case msgWelcome:
 			var m welcomeMsg
 			if json.Unmarshal(body, &m) == nil {

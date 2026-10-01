@@ -19,6 +19,8 @@ const (
 	msgLobbyState
 	msgSetReady
 	msgStartGame
+	msgPlayerState    // client -> host, own state, unreliable
+	msgPlayerSnapshot // host -> clients, all states, unreliable
 )
 
 // Lobby messages are rare and small, so they are a type byte followed by

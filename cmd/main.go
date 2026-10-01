@@ -85,6 +85,7 @@ func drawScene() {
 		world.DrawPumpkinLamp()
 	}
 
+	drawRemotePlayers()
 	player.DrawPlayerTexture()
 
 	if !inDungeon && !inBoss {
@@ -343,10 +344,13 @@ func render() {
 	} else {
 		rl.ClearBackground(worldBgColor)
 	}
+	collectVisibleRemotes()
 	rl.BeginMode2D(cam)
 
 	drawScene()
 	rl.EndMode2D()
+
+	drawRemoteNames()
 
 	if currentScene == scenePlaying {
 		player.DrawHealthBar()

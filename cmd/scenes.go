@@ -75,6 +75,9 @@ func updateLobby() {
 	if gameLobby == nil {
 		return
 	}
+	if currentScene == scenePlaying {
+		sendLocalState()
+	}
 	gameLobby.Update()
 	if gameLobby.State == lobby.StateClosed {
 		msg := ""

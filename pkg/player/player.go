@@ -157,6 +157,26 @@ func DrawPlayerTexture() {
 	rl.DrawTexturePro(playerSprite, playerSrc, PlayerDest, rl.NewVector2(0, 0), 0, rl.White)
 }
 
+// Appearance returns what other players need to draw this player: the
+// sprite position plus the current sprite sheet row and column.
+func Appearance() (x, y float32, dir Direction, frame int) {
+	return PlayerDest.X, PlayerDest.Y, playerDir, int(playerSrc.X / playerSrc.Width)
+}
+
+// DrawCharacter draws another player's character with the player sprite sheet.
+func DrawCharacter(x, y float32, dir Direction, frame int, tint rl.Color) {
+	// Values come from the network, keep them inside the sprite sheet.
+	if dir < DirIdleDown || dir > DirDashUp {
+		dir = DirIdleDown
+	}
+	if frame < 0 || frame > 7 {
+		frame = 0
+	}
+	src := rl.NewRectangle(playerSrc.Width*float32(frame), playerSrc.Height*float32(dir), playerSrc.Width, playerSrc.Height)
+	dest := rl.NewRectangle(x, y, PlayerDest.Width, PlayerDest.Height)
+	rl.DrawTexturePro(playerSprite, src, dest, rl.NewVector2(0, 0), 0, tint)
+}
+
 func PlayerInput() {
 	// Block input while dead so the player can't move/attack during death animation
 	if IsPlayerDead() {
