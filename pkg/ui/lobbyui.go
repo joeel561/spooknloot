@@ -262,3 +262,34 @@ func DrawMultiplayerHUD(l *lobby.Lobby) {
 	rl.DrawRectangle(x-10, 12, w+20, 30, rl.NewColor(0, 0, 0, 150))
 	rl.DrawText(text, x, 18, 18, rl.RayWhite)
 }
+
+// DrawRunProgress shows how far the group is on the way to the boss:
+// one segment per dungeon level, the current one highlighted.
+func DrawRunProgress(level, levels int) {
+	const segW, segH, gap = float32(16), float32(10), float32(3)
+	barW := float32(levels)*(segW+gap) - gap
+	bossLabel := "BOSS"
+	bossW := measureLabel(bossLabel, 20)
+	w := barW + 16 + bossW + 32
+	cx := float32(rl.GetScreenWidth()) / 2
+	box := rl.NewRectangle(cx-w/2, 12, w, 62)
+	drawPanel(box)
+
+	title := fmt.Sprintf("Level %d / %d", level, levels)
+	drawLabelCentered(title, cx, box.Y+8, 22, rl.RayWhite)
+
+	x := box.X + 16
+	y := box.Y + 40
+	for i := 1; i <= levels; i++ {
+		color := rl.NewColor(60, 45, 60, 255)
+		switch {
+		case i < level:
+			color = readyColor
+		case i == level:
+			color = accentColor
+		}
+		rl.DrawRectangleRec(rl.NewRectangle(x, y, segW, segH), color)
+		x += segW + gap
+	}
+	drawLabel(bossLabel, x+16-gap, y-6, 20, errorTextColor)
+}

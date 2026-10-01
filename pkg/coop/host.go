@@ -20,7 +20,7 @@ type Config struct {
 const (
 	worldMobCount      = 8
 	worldRespawnFrames = 30 * 60
-	dungeonLevels      = 20
+	DungeonLevels      = 20 // levels before the boss
 	bossExtraMobs      = 19
 	bossPotions        = 5
 	potionHeal         = 0.6
@@ -332,7 +332,7 @@ func (h *host) handle(from PeerID, data []byte) {
 		if h.run == nil {
 			h.startRun(from)
 		}
-		h.run.level = dungeonLevels
+		h.run.level = DungeonLevels
 		h.nextLevel()
 	}
 }
@@ -392,7 +392,7 @@ func (h *host) sendEnterArea(id PeerID) {
 }
 
 func (h *host) nextLevel() {
-	if h.run.level >= dungeonLevels {
+	if h.run.level >= DungeonLevels {
 		h.setupBoss()
 	} else {
 		h.setupDungeon(h.run.level + 1)
@@ -448,6 +448,6 @@ func (h *host) setupBoss() {
 	h.rng.Shuffle(len(floor), func(i, j int) { floor[i], floor[j] = floor[j], floor[i] })
 	a.potions = floor[:min(bossPotions, len(floor))]
 
-	h.run.level = dungeonLevels + 1
+	h.run.level = DungeonLevels + 1
 	h.run.area = a
 }

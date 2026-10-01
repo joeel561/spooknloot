@@ -264,6 +264,9 @@ func render() {
 			ui.DrawInvite(inv.From, inv.Until)
 		}
 		drawDownedBanner()
+		if currentArea() == lobby.AreaDungeon {
+			ui.DrawRunProgress(session.Level, coop.DungeonLevels)
+		}
 	}
 
 	if bossWinOpen {
