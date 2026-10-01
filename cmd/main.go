@@ -6,7 +6,9 @@ import (
 	"spooknloot/pkg/boss"
 	"spooknloot/pkg/debug"
 	"spooknloot/pkg/dungeon"
+	"spooknloot/pkg/lobby"
 	"spooknloot/pkg/mobs"
+	"spooknloot/pkg/netcode"
 	"spooknloot/pkg/player"
 	"spooknloot/pkg/ui"
 	"spooknloot/pkg/world"
@@ -32,8 +34,15 @@ var (
 	currentMusic string
 	printDebug   bool
 
-	menuOpen        bool = true
+	menuOpen        bool
 	menuPausedMusic bool
+
+	currentScene  = sceneTitle
+	nameInput     = ui.TextInput{MaxLen: lobby.MaxNameLength}
+	addressInput  = ui.TextInput{MaxLen: 64}
+	statusMessage string
+	lanBrowser    *netcode.Browser
+	gameLobby     *lobby.Lobby
 
 	inDungeon           bool
 	inBoss              bool
@@ -47,6 +56,15 @@ var (
 	mobsClearFrames     int
 
 	bossWinOpen bool
+)
+
+type scene int
+
+const (
+	sceneTitle scene = iota
+	sceneJoin
+	sceneLobby
+	scenePlaying
 )
 
 func drawScene() {
@@ -138,6 +156,8 @@ func init() {
 
 	printDebug = false
 
+	nameInput.Text = lobby.SanitizeName(os.Getenv("USERNAME"))
+
 	playTrack("world")
 
 	ui.InitMenu("assets/ui/map.png")
@@ -146,10 +166,6 @@ func init() {
 func input() {
 	if rl.IsKeyPressed(rl.KeyF10) {
 		rl.ToggleBorderlessWindowed()
-	}
-
-	if rl.IsKeyPressed(rl.KeyB) {
-		enterBoss()
 	}
 
 	if rl.IsKeyPressed(rl.KeyF7) {
@@ -161,7 +177,20 @@ func input() {
 		}
 	}
 
+	// Title, join and lobby screens handle their own input while drawing.
+	if currentScene != scenePlaying {
+		return
+	}
+
+	if rl.IsKeyPressed(rl.KeyB) {
+		enterBoss()
+	}
+
 	if menuOpen {
+		if rl.IsKeyPressed(rl.KeyQ) {
+			returnToTitle("")
+			return
+		}
 		if rl.IsKeyPressed(rl.KeyEnter) || rl.IsKeyPressed(rl.KeyEscape) {
 			menuOpen = false
 			if menuPausedMusic {
@@ -205,8 +234,9 @@ func update() {
 	running = !rl.WindowShouldClose()
 
 	updateCurrentMusic()
+	updateLobby()
 
-	if menuOpen {
+	if currentScene != scenePlaying || menuOpen {
 		return
 	}
 
@@ -318,7 +348,12 @@ func render() {
 	drawScene()
 	rl.EndMode2D()
 
-	player.DrawHealthBar()
+	if currentScene == scenePlaying {
+		player.DrawHealthBar()
+		if gameLobby != nil {
+			ui.DrawMultiplayerHUD(gameLobby)
+		}
+	}
 
 	if bossWinOpen {
 		ui.DrawBossWinOverlay()
@@ -355,10 +390,16 @@ func render() {
 		ui.DrawMenuOverlay()
 	}
 
+	drawMenuScreens()
+
 	rl.EndDrawing()
 }
 
 func quit() {
+	if gameLobby != nil {
+		gameLobby.Leave()
+	}
+	stopLANBrowser()
 	stopAllTracks()
 	if worldMusic.CtxType != 0 {
 		rl.UnloadMusicStream(worldMusic)

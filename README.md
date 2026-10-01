@@ -40,12 +40,12 @@
 
 3. Spiel starten:
    ```bash
-   go run ./cmd/main.go
+   go run ./cmd
    ```
 
    oder (wenn du bauen willst):
    ```bash
-   go build -o spooknloot ./cmd/main.go
+   go build -o spooknloot ./cmd
    ./spooknloot
    ```
 
