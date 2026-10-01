@@ -7,13 +7,15 @@ import (
 )
 
 var (
-	panelColor        = rl.NewColor(25, 17, 27, 235)
-	panelBorderColor  = rl.NewColor(134, 87, 87, 255)
-	buttonColor       = rl.NewColor(74, 48, 66, 255)
-	buttonHoverColor  = rl.NewColor(110, 66, 86, 255)
-	buttonDisabled    = rl.NewColor(50, 42, 50, 255)
-	accentColor       = rl.NewColor(231, 152, 50, 255)
-	mutedTextColor    = rl.NewColor(170, 150, 160, 255)
+	panelColor       = rl.NewColor(25, 17, 27, 235)
+	panelBorderColor = rl.NewColor(134, 87, 87, 255)
+	buttonColor      = rl.NewColor(74, 48, 66, 255)
+	buttonHoverColor = rl.NewColor(110, 66, 86, 255)
+	buttonDisabled   = rl.NewColor(50, 42, 50, 255)
+	accentColor      = rl.NewColor(231, 152, 50, 255)
+	mutedTextColor   = rl.NewColor(170, 150, 160, 255)
+	// MutedTextColor is for secondary text outside this package.
+	MutedTextColor    = mutedTextColor
 	errorTextColor    = rl.NewColor(230, 100, 100, 255)
 	readyColor        = rl.NewColor(120, 190, 110, 255)
 	inputColor        = rl.NewColor(15, 10, 17, 255)

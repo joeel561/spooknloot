@@ -267,6 +267,11 @@ func render() {
 		if currentArea() == lobby.AreaDungeon {
 			ui.DrawRunProgress(session.Level, coop.DungeonLevels)
 		}
+		rows := scoreRows()
+		ui.DrawLiveRanking(rows)
+		if rl.IsKeyDown(rl.KeyTab) && !menuOpen {
+			ui.DrawScoreboard(rows)
+		}
 	}
 
 	if bossWinOpen {

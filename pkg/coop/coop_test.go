@@ -371,3 +371,35 @@ func TestMobChunksRoundTrip(t *testing.T) {
 }
 
 func (g *game) hostState() *host { return g.sessions[1].host }
+
+func TestKillsAreCountedForTheKiller(t *testing.T) {
+	g := newGame(t, 2)
+	g.sessions[2].EnterDungeon()
+	g.step(6)
+	total := len(g.sessions[2].Mobs())
+	g.killAll(2)
+	g.step(scoreSendEvery + 6)
+	for _, id := range []PeerID{1, 2} {
+		s := g.sessions[id]
+		if s.Kills(2) != total || s.Kills(1) != 0 {
+			t.Errorf("player %d sees kills %d/%d, want 0/%d", id, s.Kills(1), s.Kills(2), total)
+		}
+	}
+}
+
+func TestDyingMobGivesNoSecondKill(t *testing.T) {
+	g := newGame(t, 1)
+	s := g.sessions[1]
+	s.EnterDungeon()
+	g.step(6)
+	m := s.Mobs()[0]
+	g.place(1, m.Center())
+	for i := 0; i < 5; i++ { // more hits than needed
+		s.Attack(m.ID)
+		g.step(playerAttackCooldown + 1)
+	}
+	g.step(scoreSendEvery)
+	if s.Kills(1) != 1 {
+		t.Errorf("kills = %d, want 1", s.Kills(1))
+	}
+}

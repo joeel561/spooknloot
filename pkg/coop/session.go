@@ -80,6 +80,7 @@ type Session struct {
 
 	reviveTarget PeerID
 	mobs         map[uint16]*mobTrack
+	kills        map[PeerID]int
 	events       []Event
 	hostInbox    []Message
 	clientInbox  [][]byte
@@ -337,6 +338,8 @@ func (s *Session) clientHandle(data []byte) {
 		if a := r.f32(); r.err == nil {
 			s.events = append(s.events, Event{Kind: EventRevived, Amount: a})
 		}
+	case msgScores:
+		s.receiveScores(r)
 	case msgWipe:
 		s.toWorld()
 		s.events = append(s.events, Event{Kind: EventWipe})

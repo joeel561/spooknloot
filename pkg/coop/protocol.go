@@ -35,6 +35,7 @@ const (
 	msgPlayerStatus // host -> run members: someone is down, dead or up again
 	msgRevived      // host -> client: you were revived
 	msgWipe         // host -> run members: everybody is down, run over
+	msgScores       // host -> everyone: kills per player
 )
 
 // Epoch identifies one instance of an area (the world, or one dungeon

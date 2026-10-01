@@ -73,6 +73,7 @@ type host struct {
 	local      lobby.PlayerState
 	hasLocal   bool
 	lastAttack map[PeerID]int
+	scores     scoreboard
 	// players is rebuilt every frame: everyone connected and their state.
 	players map[PeerID]*lobby.PlayerState
 }
@@ -150,6 +151,7 @@ func (h *host) update(inbox []Message) {
 		h.updateRevives()
 	}
 	h.sendAreas()
+	h.sendScores()
 }
 
 func (h *host) collectPlayers() {
@@ -317,7 +319,9 @@ func (h *host) handle(from PeerID, data []byte) {
 			return
 		}
 		h.lastAttack[from] = h.frame
-		a.mobs.Damage(mobID, playerAttackDamage)
+		if a.mobs.Damage(mobID, playerAttackDamage) && m.Dying {
+			h.creditKill(from)
+		}
 	case msgReviveStart:
 		target := PeerID(r.u32())
 		if r.err == nil && h.players[target] != nil {
