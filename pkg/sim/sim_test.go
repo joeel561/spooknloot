@@ -2,7 +2,6 @@ package sim
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
 )
 
@@ -61,7 +60,7 @@ func TestRandomFloorPositionsAreFloor(t *testing.T) {
 
 func TestMobsChaseNearestPlayer(t *testing.T) {
 	w := NewOpenWorld(nil, 1)
-	w.SpawnRandom([]Vec2{{100, 100}}, 5, rand.New(rand.NewSource(1)))
+	w.SpawnKind(KindSkeleton1, Vec2{100, 100}, 5)
 	near := Target{ID: 1, Pos: Vec2{150, 108}}
 	far := Target{ID: 2, Pos: Vec2{0, 108}}
 	start := w.Mobs[0].Center()
@@ -75,7 +74,7 @@ func TestMobsChaseNearestPlayer(t *testing.T) {
 
 func TestMobAttacksAndRespectsCooldown(t *testing.T) {
 	w := NewOpenWorld(nil, 0.9)
-	w.SpawnRandom([]Vec2{{100, 100}}, 5, rand.New(rand.NewSource(1)))
+	w.SpawnKind(KindSkeleton1, Vec2{100, 100}, 5)
 	target := Target{ID: 7, Pos: w.Mobs[0].Center()}
 	target.Pos.X += 15 // in attack range, not moving
 
@@ -95,7 +94,7 @@ func TestMobAttacksAndRespectsCooldown(t *testing.T) {
 
 func TestMobDiesAndDisappears(t *testing.T) {
 	w := NewOpenWorld(nil, 1)
-	w.SpawnRandom([]Vec2{{0, 0}}, 5, rand.New(rand.NewSource(1)))
+	w.SpawnKind(KindSkeleton1, Vec2{0, 0}, 5)
 	id := w.Mobs[0].ID
 	w.Damage(id, 2.5)
 	if !w.Mobs[0].Alive() {
@@ -136,7 +135,7 @@ func TestMobsCollideWithWalls(t *testing.T) {
 		walls = append(walls, Rect{128, float32(y * TileSize), TileSize, TileSize})
 	}
 	w := NewOpenWorld(walls, 1)
-	w.SpawnRandom([]Vec2{{100, 100}}, 5, rand.New(rand.NewSource(1)))
+	w.SpawnKind(KindSkeleton1, Vec2{100, 100}, 5)
 	target := Target{ID: 1, Pos: Vec2{200, 108}}
 	for i := 0; i < 200; i++ {
 		w.Update([]Target{target})
@@ -167,7 +166,9 @@ func TestFlowFieldLeadsAroundWalls(t *testing.T) {
 			continue
 		}
 		w := NewFlowWorld(l.Walls, 1)
-		w.SpawnRandom(starts, 5, rand.New(rand.NewSource(1)))
+		for _, p := range starts {
+			w.SpawnKind(KindSkeleton1, p, 5)
+		}
 		for i := 0; i < 900; i++ {
 			w.Update([]Target{target})
 		}

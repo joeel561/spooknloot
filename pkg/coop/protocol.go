@@ -39,6 +39,7 @@ const (
 	msgDrops        // host -> area members: loot on the floor
 	msgInventory    // host -> client: your gold and potions
 	msgUsePotion    // client -> host: drink a potion
+	msgProjectiles  // host -> area members: ghost shots in flight, unreliable
 )
 
 // Epoch identifies one instance of an area (the world, or one dungeon
@@ -233,4 +234,36 @@ func decodeMobChunk(r *reader) (uint32, []MobView) {
 		})
 	}
 	return epoch, mobs
+}
+
+// ProjectileView is a shot as clients see it.
+type ProjectileView struct {
+	ID  uint16
+	Pos sim.Vec2
+	Vel sim.Vec2 // pixels per frame
+}
+
+const maxProjectilesPerMsg = 255
+
+func encodeProjectiles(epoch uint32, ps []sim.Projectile) []byte {
+	ps = ps[:min(len(ps), maxProjectilesPerMsg)]
+	w := newMsg(msgProjectiles)
+	w.u32(epoch)
+	w.u8(uint8(len(ps)))
+	for _, p := range ps {
+		w.u16(p.ID)
+		w.vec(p.Pos)
+		w.vec(p.Vel)
+	}
+	return w.bytes()
+}
+
+func decodeProjectiles(r *reader) (uint32, []ProjectileView) {
+	epoch := r.u32()
+	n := int(r.u8())
+	out := make([]ProjectileView, 0, n)
+	for i := 0; i < n && r.err == nil; i++ {
+		out = append(out, ProjectileView{ID: r.u16(), Pos: r.vec(), Vel: r.vec()})
+	}
+	return epoch, out
 }

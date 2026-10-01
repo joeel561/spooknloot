@@ -26,9 +26,11 @@ func TestKilledMobDropsGoldThatCanBePickedUp(t *testing.T) {
 	a := g.hostState().run.area
 	a.potions = nil
 	m := &a.mobs.Mobs[0]
-	// Stand far away and hit from range is not possible; kill it up close,
-	// then step back so the loot stays on the floor.
-	for m.Alive() {
+	// Kill it up close, then step back so the loot stays on the floor.
+	for hits := 0; m.Alive(); hits++ {
+		if hits > 20 {
+			t.Fatal("mob does not die")
+		}
 		g.place(1, m.Center())
 		s.Attack(m.ID)
 		g.step(playerAttackCooldown + 1)

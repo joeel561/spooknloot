@@ -15,9 +15,10 @@ const (
 	KindSkeleton3
 	KindZombie
 	KindBoss
+	KindGhost // ranged
 )
 
-var regularKinds = []MobKind{KindBat, KindSkeleton1, KindSkeleton2, KindSkeleton3, KindZombie}
+var regularKinds = []MobKind{KindBat, KindSkeleton1, KindSkeleton2, KindSkeleton3, KindZombie, KindGhost}
 
 // Sprite sheet rows, same order as the mob sprite sheets.
 const (
@@ -50,8 +51,6 @@ const (
 	attackDuration   = 20
 	attackCooldown   = 60
 	chaseRange       = 180
-	moveSpeed        = 0.6
-	bossMoveSpeed    = 0.9
 	bossDamageTaken  = 0.6
 	flowRecalcFrames = 6
 	damageFlashTimer = 6
@@ -116,6 +115,10 @@ type MobWorld struct {
 	grid    *tileGrid
 	useFlow bool
 	flows   map[uint32]*flowField
+
+	// Projectiles are ghost shots in flight.
+	Projectiles      []Projectile
+	nextProjectileID uint16
 }
 
 // NewOpenWorld creates mobs that walk straight at players and slide along
@@ -137,18 +140,18 @@ func (w *MobWorld) add(m Mob) *Mob {
 	return &w.Mobs[len(w.Mobs)-1]
 }
 
-// SpawnRandom adds mobs of random regular kinds at the given positions.
+// SpawnRandom adds mobs of random regular kinds at the given positions;
+// health is the base health, scaled per kind.
 func (w *MobWorld) SpawnRandom(positions []Vec2, health float32, rng *rand.Rand) {
 	for _, p := range positions {
-		w.add(Mob{
-			Kind:      regularKinds[rng.Intn(len(regularKinds))],
-			Pos:       p,
-			Size:      16,
-			HitSize:   8,
-			MaxHealth: health,
-			Health:    health,
-		})
+		w.SpawnKind(regularKinds[rng.Intn(len(regularKinds))], p, health)
 	}
+}
+
+// SpawnKind adds one regular mob of the given kind.
+func (w *MobWorld) SpawnKind(kind MobKind, p Vec2, health float32) {
+	health *= kind.stats().Health
+	w.add(Mob{Kind: kind, Pos: p, Size: 16, HitSize: 8, MaxHealth: health, Health: health})
 }
 
 func (w *MobWorld) SpawnBoss(p Vec2, health float32) {
@@ -271,25 +274,26 @@ func (w *MobWorld) Update(targets []Target) []Hit {
 			continue
 		}
 
-		if hit, ok := w.updateMob(m, targets); ok {
+		if m.Kind.IsRanged() {
+			w.updateRanged(m, targets)
+		} else if hit, ok := w.updateMob(m, targets); ok {
 			hits = append(hits, hit)
 		}
 		if !w.useFlow {
 			w.resolveCollision(m)
 		}
 	}
-	return hits
+	return append(hits, w.updateProjectiles(targets)...)
 }
 
 func (w *MobWorld) updateMob(m *Mob, targets []Target) (Hit, bool) {
 	center := m.Center()
 	target, dist, found := nearest(center, targets)
+	st := m.Kind.stats()
 
 	rangeLimit := float32(attackRange)
-	speed := float32(moveSpeed)
 	if m.Kind == KindBoss {
 		rangeLimit = bossAttackRange
-		speed = bossMoveSpeed
 	}
 
 	if found && dist <= rangeLimit && w.frame-m.lastAttack >= attackCooldown && !m.attacking {
@@ -306,7 +310,7 @@ func (w *MobWorld) updateMob(m *Mob, targets []Target) (Hit, bool) {
 		m.attackTimer--
 		// The attack connects a few frames into the animation.
 		if m.attackTimer == attackDuration-3 {
-			hit, landed = Hit{Target: m.attackTarget, Damage: w.HitDamage}, true
+			hit, landed = Hit{Target: m.attackTarget, Damage: w.HitDamage * st.Damage}, true
 		}
 		if m.attackTimer <= 0 {
 			m.attacking = false
@@ -325,6 +329,12 @@ func (w *MobWorld) updateMob(m *Mob, targets []Target) (Hit, bool) {
 			}
 		}
 	}
+	w.move(m, dx, dy, st.Speed)
+	return hit, landed
+}
+
+// move walks a mob along (dx, dy) at the given speed and faces it that way.
+func (w *MobWorld) move(m *Mob, dx, dy, speed float32) {
 	if l := float32(math.Hypot(float64(dx), float64(dy))); l > 0 {
 		dx, dy = dx/l, dy/l
 	}
@@ -341,7 +351,6 @@ func (w *MobWorld) updateMob(m *Mob, targets []Target) (Hit, bool) {
 	}
 	m.Pos.X += dx * speed
 	m.Pos.Y += dy * speed
-	return hit, landed
 }
 
 // resolveCollision slides along obstacles: try undoing X, then Y, then both.

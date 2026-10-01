@@ -275,6 +275,10 @@ func (h *host) sendAreas() {
 		for i := range a.mobs.Mobs {
 			views = append(views, mobView(&a.mobs.Mobs[i]))
 		}
+		shots := encodeProjectiles(a.epoch, a.mobs.Projectiles)
+		for _, id := range members {
+			h.s.hostSend(id, shots, false)
+		}
 		for _, chunk := range encodeMobChunks(a.epoch, views) {
 			for _, id := range members {
 				h.s.hostSend(id, chunk, false)

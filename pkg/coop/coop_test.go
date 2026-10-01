@@ -241,9 +241,19 @@ func TestMobsTargetPlayersInTheirArea(t *testing.T) {
 	g := newGame(t, 2)
 	g.sessions[2].EnterDungeon()
 	g.step(6)
-	// Stand right on a dungeon mob and wait for attacks.
-	m := g.sessions[2].Mobs()[0]
-	g.place(2, m.Center())
+	// Stand right on a melee mob (ghosts back off and shoot later) and
+	// wait for attacks.
+	var melee *sim.Mob
+	for i, m := range g.hostState().run.area.mobs.Mobs {
+		if !m.Kind.IsRanged() {
+			melee = &g.hostState().run.area.mobs.Mobs[i]
+			break
+		}
+	}
+	if melee == nil {
+		t.Fatal("no melee mob in the dungeon")
+	}
+	g.place(2, melee.Center())
 	g.step(120)
 	if len(g.takeEvents(2, EventDamage)) == 0 {
 		t.Error("dungeon mob never hit the player standing on it")
@@ -410,5 +420,29 @@ func TestDyingMobGivesNoSecondKill(t *testing.T) {
 	g.step(scoreSendEvery)
 	if s.Kills(1) != 1 {
 		t.Errorf("kills = %d, want 1", s.Kills(1))
+	}
+}
+
+func TestGhostShotsReachClients(t *testing.T) {
+	g := newGame(t, 2)
+	world := g.hostState().world
+	world.mobs.Mobs = nil
+	target := sim.Vec2{X: 2100, Y: 2000}
+	g.place(1, sim.Vec2{X: 5000, Y: 5000}) // out of the way
+	g.place(2, target)
+	world.mobs.SpawnKind(sim.KindGhost, sim.Vec2{X: target.X - 108, Y: target.Y - 8}, 5)
+
+	sawShot := false
+	for i := 0; i < 400 && len(g.events[2]) == 0; i++ {
+		g.step(1)
+		if len(g.sessions[2].Projectiles()) > 0 {
+			sawShot = true
+		}
+	}
+	if !sawShot {
+		t.Error("client never saw the ghost's shot")
+	}
+	if len(g.takeEvents(2, EventDamage)) == 0 {
+		t.Error("ghost shot never hit the player")
 	}
 }

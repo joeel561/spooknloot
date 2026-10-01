@@ -35,6 +35,8 @@ func TestMageHitsFromRangeWarriorDoesNot(t *testing.T) {
 func TestClassDamage(t *testing.T) {
 	for _, class := range sim.AllClasses {
 		g, m := mobInDungeon(t, class)
+		// Mob kinds differ in health; make sure one hit can't kill it.
+		m.MaxHealth, m.Health = 10, 10
 		g.place(1, m.Center())
 		g.sessions[1].Attack(m.ID)
 		g.step(2)

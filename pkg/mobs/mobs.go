@@ -18,6 +18,7 @@ func InitMobs() {
 	sprites[sim.KindSkeleton3] = rl.LoadTexture("assets/mobs/skeleton_3.png")
 	sprites[sim.KindZombie] = rl.LoadTexture("assets/mobs/zombie.png")
 	sprites[sim.KindBoss] = rl.LoadTexture("assets/mobs/boss.png")
+	sprites[sim.KindGhost] = rl.LoadTexture("assets/mobs/ghost-spritesheet.png")
 }
 
 func UnloadMobsTexture() {
@@ -34,13 +35,18 @@ func DrawMobs(views []coop.MobView) {
 		if !ok {
 			continue
 		}
-		size := float32(16)
-		if m.Kind == sim.KindBoss {
-			size = 64
+		var dest rl.Rectangle
+		if m.Kind == sim.KindGhost {
+			dest = drawGhost(tex, m)
+		} else {
+			size := float32(16)
+			if m.Kind == sim.KindBoss {
+				size = 64
+			}
+			src := rl.NewRectangle(size*float32(m.Frame), size*float32(m.Dir), size, size)
+			dest = rl.NewRectangle(m.Pos.X, m.Pos.Y, size, size)
+			rl.DrawTexturePro(tex, src, dest, rl.NewVector2(0, 0), 0, rl.White)
 		}
-		src := rl.NewRectangle(size*float32(m.Frame), size*float32(m.Dir), size, size)
-		dest := rl.NewRectangle(m.Pos.X, m.Pos.Y, size, size)
-		rl.DrawTexturePro(tex, src, dest, rl.NewVector2(0, 0), 0, rl.White)
 		if !m.Dying && m.Kind != sim.KindBoss {
 			drawHealthBar(dest, float32(m.Health)/100)
 		}

@@ -93,6 +93,8 @@ type Session struct {
 	reviveTarget PeerID
 	mobs         map[uint16]*mobTrack
 	kills        map[PeerID]int
+	shots        []ProjectileView
+	shotsAt      time.Time
 	events       []Event
 	hostInbox    []Message
 	clientInbox  [][]byte
@@ -257,6 +259,7 @@ func (s *Session) SetReviving(target PeerID) {
 func (s *Session) toWorld() {
 	s.Area, s.Epoch, s.Level, s.Layout = lobby.AreaWorld, worldEpoch, 0, nil
 	s.ExitOpen, s.Potions, s.Drops = false, nil, nil
+	s.shots = nil
 	s.mobs = map[uint16]*mobTrack{}
 	s.Statuses = map[PeerID]Status{}
 	s.reviveTarget = 0
@@ -276,6 +279,7 @@ func (s *Session) clientHandle(data []byte) {
 			s.Layout = sim.GenerateDungeon(m.Seed)
 		}
 		s.ExitOpen, s.Potions, s.Invite, s.Drops = false, nil, nil, nil
+		s.shots = nil
 		s.mobs = map[uint16]*mobTrack{}
 		// Everyone starts a new area standing; the host sends who is down
 		// to players joining mid-level.
@@ -355,6 +359,10 @@ func (s *Session) clientHandle(data []byte) {
 		s.receiveDrops(r)
 	case msgInventory:
 		s.receiveInventory(r)
+	case msgProjectiles:
+		if epoch, shots := decodeProjectiles(r); r.err == nil && epoch == s.Epoch {
+			s.shots, s.shotsAt = shots, time.Now()
+		}
 	case msgScores:
 		s.receiveScores(r)
 	case msgWipe:
@@ -405,4 +413,21 @@ func (s *Session) Boss() (uint8, bool) {
 		}
 	}
 	return 0, false
+}
+
+// maxShotExtrapolation limits how far shots fly on between updates, so a
+// lost packet doesn't send them through walls.
+const maxShotExtrapolation = 12 // frames
+
+// Projectiles returns the shots in flight, moved along their path since
+// the last update so they fly smoothly.
+func (s *Session) Projectiles() []ProjectileView {
+	frames := float32(min(time.Since(s.shotsAt).Seconds()*60, maxShotExtrapolation))
+	out := make([]ProjectileView, len(s.shots))
+	for i, p := range s.shots {
+		p.Pos.X += p.Vel.X * frames
+		p.Pos.Y += p.Vel.Y * frames
+		out[i] = p
+	}
+	return out
 }
