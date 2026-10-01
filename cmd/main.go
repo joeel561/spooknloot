@@ -286,8 +286,16 @@ func render() {
 
 	drawMenuScreens()
 
+	if devFrameHook != nil {
+		devFrameHook()
+	}
+
 	rl.EndDrawing()
 }
+
+// devFrameHook runs at the end of every rendered frame when set. Local test
+// scripts use it to drive the game and take screenshots.
+var devFrameHook func()
 
 func drawBossHealthBar(percent float32) {
 	barW := float32(480)

@@ -66,8 +66,12 @@ func NewHost(playerName string, port int) (*Lobby, error) {
 	return newHost(playerName, "", port, true)
 }
 
-// newHost binds to listenIP ("" for all interfaces). Tests use 127.0.0.1
-// without LAN announcements so Windows Firewall does not prompt.
+// NewHostOn binds to listenIP only ("" for all interfaces). Local tests use
+// 127.0.0.1 without LAN announcements so Windows Firewall does not prompt.
+func NewHostOn(playerName, listenIP string, port int, announce bool) (*Lobby, error) {
+	return newHost(playerName, listenIP, port, announce)
+}
+
 func newHost(playerName, listenIP string, port int, announce bool) (*Lobby, error) {
 	h, err := netcode.Host(net.JoinHostPort(listenIP, fmt.Sprint(port)))
 	if err != nil {
