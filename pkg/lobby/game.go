@@ -177,6 +177,50 @@ func (l *Lobby) clientReceiveSnapshot(body []byte) {
 	}
 }
 
+// GameMessage is a gameplay message passed through the lobby connection.
+// Data starts with its message type (>= MsgGameFirst).
+type GameMessage struct {
+	From netcode.PeerID
+	Data []byte
+}
+
+// SendGame sends a gameplay message. On a client it always goes to the host.
+func (l *Lobby) SendGame(to netcode.PeerID, data []byte, reliable bool) {
+	if l.transport == nil || l.State != StateInGame {
+		return
+	}
+	_ = l.transport.Send(to, data, reliable)
+}
+
+// TakeGameMessages returns the gameplay messages received since the last call.
+func (l *Lobby) TakeGameMessages() []GameMessage {
+	m := l.gameInbox
+	l.gameInbox = nil
+	return m
+}
+
+// LatestStates returns the most recent state of every other player
+// without interpolation (used by the host for the simulation).
+func (l *Lobby) LatestStates() []PlayerState {
+	out := make([]PlayerState, 0, len(l.game.remotes))
+	for id, t := range l.game.remotes {
+		if id != l.LocalID && len(t.samples) > 0 {
+			out = append(out, t.samples[len(t.samples)-1].state)
+		}
+	}
+	return out
+}
+
+// PlayerName returns the display name of a player.
+func (l *Lobby) PlayerName(id netcode.PeerID) string {
+	for _, p := range l.Players {
+		if p.ID == id {
+			return p.Name
+		}
+	}
+	return "?"
+}
+
 func (l *Lobby) hasPlayer(id netcode.PeerID) bool {
 	for _, p := range l.Players {
 		if p.ID == id {

@@ -53,6 +53,7 @@ type Lobby struct {
 	dialDone  chan dialResult
 	started   bool
 	game      gameState
+	gameInbox []GameMessage
 }
 
 type dialResult struct {
@@ -176,6 +177,12 @@ func (l *Lobby) hostHandle(ev netcode.Event) {
 		if err != nil {
 			return
 		}
+		if t >= MsgGameFirst {
+			if l.State == StateInGame && l.hasPlayer(ev.Peer) {
+				l.gameInbox = append(l.gameInbox, GameMessage{From: ev.Peer, Data: ev.Data})
+			}
+			return
+		}
 		switch t {
 		case msgPlayerState:
 			l.hostReceiveState(ev.Peer, body)
@@ -276,6 +283,10 @@ func (l *Lobby) clientHandle(ev netcode.Event) {
 	case netcode.EventMessage:
 		t, body, err := decode(ev.Data)
 		if err != nil {
+			return
+		}
+		if t >= MsgGameFirst {
+			l.gameInbox = append(l.gameInbox, GameMessage{From: ev.Peer, Data: ev.Data})
 			return
 		}
 		switch t {
