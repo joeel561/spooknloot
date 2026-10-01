@@ -254,7 +254,6 @@ func TryAttack(targetPos rl.Vector2, attackFunc func(float32)) bool {
 
 func PlayerMoving() {
 	oldX, oldY = PlayerDest.X, PlayerDest.Y
-	playerSrc.X = playerSrc.Width * float32(playerFrame)
 
 	if IsPlayerDead() {
 		if attackSoundLoaded && rl.IsSoundPlaying(attackSound) {
@@ -450,6 +449,11 @@ func PlayerMoving() {
 		if damageSoundLoaded && !rl.IsSoundPlaying(damageSound) {
 			rl.PlaySound(damageSound)
 		}
+		// Back to the idle pose: the damage rows only have two frames, so
+		// standing still in them shows an empty frame (invisible player).
+		if playerDamageTimer == 0 && playerDir >= DirDamageDown && playerDir <= DirDamageUp {
+			playerDir = idleDirection()
+		}
 	} else {
 		if damageSoundLoaded && rl.IsSoundPlaying(damageSound) {
 			rl.StopSound(damageSound)
@@ -486,6 +490,9 @@ func PlayerMoving() {
 		playerFrame = 0
 	}
 
+	// Row and frame are set together, so a row change (e.g. a hit) never
+	// shows a frame that row does not have.
+	playerSrc.X = playerSrc.Width * float32(playerFrame)
 	playerSrc.Y = playerSrc.Height * float32(playerDir)
 
 	if attackActive {
@@ -784,4 +791,18 @@ func SetClass(health, reach float32, tint rl.Color) {
 	attackRange = reach
 	playerTint = tint
 	UpdateHealthBar()
+}
+
+// idleDirection is the standing pose for the way the player last faced.
+func idleDirection() Direction {
+	switch baseFacing {
+	case DirMoveUp:
+		return DirIdleUp
+	case DirMoveLeft:
+		return DirIdleLeft
+	case DirMoveRight:
+		return DirIdleRight
+	default:
+		return DirIdleDown
+	}
 }
