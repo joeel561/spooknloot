@@ -310,7 +310,8 @@ func (h *host) handle(from PeerID, data []byte) {
 		}
 	case msgAttack:
 		epoch, mobID := r.u32(), r.u16()
-		if r.err != nil || h.frame-h.lastAttack[from] < playerAttackCooldown {
+		last, attacked := h.lastAttack[from]
+		if r.err != nil || (attacked && h.frame-last < playerAttackCooldown) {
 			return
 		}
 		a := h.areaOf(from)
