@@ -9,7 +9,7 @@ import (
 
 // ProtocolVersion must match between host and clients. Bump it whenever a
 // message format changes.
-const ProtocolVersion = "2"
+const ProtocolVersion = "3"
 
 // MsgGameFirst is the first message type reserved for gameplay messages.
 // The lobby passes those through untouched (see Lobby.SendGame).
