@@ -670,6 +670,18 @@ func HasPlayerDeathAnimationFinished() bool {
 	return deathAnimationComplete
 }
 
+// Revive gets a downed player back up with the given health, in place.
+func Revive(health float32) {
+	currentHealth = min(max(health, 1), maxHealth)
+	deathAnimationComplete = false
+	playerFrameDead = 0
+	playerFrame = 0
+	playerDir = DirIdleDown
+	baseFacing = DirMoveDown
+	healthRegenTimer = 0
+	UpdateHealthBar()
+}
+
 func ResetPlayer() {
 	currentHealth = maxHealth
 	PlayerDest.X = 495

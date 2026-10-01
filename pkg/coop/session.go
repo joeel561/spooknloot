@@ -17,6 +17,9 @@ const (
 	mobInterpolation = 100 * time.Millisecond
 )
 
+// reviveRetryDelay is a variable so tests can shorten it.
+var reviveRetryDelay = 500 * time.Millisecond
+
 type EventKind int
 
 const (
@@ -30,7 +33,20 @@ const (
 	EventExitOpened
 	// EventRunComplete: the boss is dead, the player is back in the world.
 	EventRunComplete
+	// EventRevived: a teammate revived you; heal to Amount of max health.
+	EventRevived
+	// EventWipe: everybody in the run is down, the player is back in the world.
+	EventWipe
 )
+
+// Status is what clients know about a run member's life state.
+type Status struct {
+	State   LifeState
+	Since   time.Time // when State last changed (local time)
+	Reviver PeerID
+	// ReviveStart is when the current reviver started (local time).
+	ReviveStart time.Time
+}
 
 type Event struct {
 	Kind   EventKind
@@ -59,13 +75,17 @@ type Session struct {
 	ExitOpen bool
 	Potions  []sim.Vec2
 	Invite   *Invite
+	// Statuses holds run members who are not simply alive, by player.
+	Statuses map[PeerID]Status
 
-	mobs        map[uint16]*mobTrack
-	events      []Event
-	hostInbox   []Message
-	clientInbox [][]byte
-	lastEnter   time.Time
-	lastExit    time.Time
+	reviveTarget PeerID
+	mobs         map[uint16]*mobTrack
+	events       []Event
+	hostInbox    []Message
+	clientInbox  [][]byte
+	lastEnter    time.Time
+	lastExit     time.Time
+	lastRevive   time.Time
 }
 
 type mobSample struct {
@@ -77,7 +97,7 @@ type mobTrack struct{ samples []mobSample }
 
 // NewSession starts a session. On the host it creates the simulation.
 func NewSession(n Net, cfg Config, seed int64) *Session {
-	s := &Session{net: n, Area: lobby.AreaWorld, Epoch: worldEpoch, mobs: map[uint16]*mobTrack{}}
+	s := &Session{net: n, Area: lobby.AreaWorld, Epoch: worldEpoch, mobs: map[uint16]*mobTrack{}, Statuses: map[PeerID]Status{}}
 	if n.IsHost() {
 		s.host = newHost(s, cfg, seed)
 	}
@@ -195,10 +215,38 @@ func (s *Session) Attack(mobID uint16) {
 // DebugBoss jumps straight to the boss (host only, B key).
 func (s *Session) DebugBoss() { s.sendToHost(newMsg(msgDebugBoss).bytes(), true) }
 
+// LocalStatus returns the local player's life state in the run.
+func (s *Session) LocalStatus() Status { return s.Statuses[s.net.LocalID()] }
+
+// SetReviving is called every frame with the downed player the local
+// player is reviving (holding E next to), or 0 for none. Only changes are
+// sent to the host.
+func (s *Session) SetReviving(target PeerID) {
+	if target == s.reviveTarget {
+		// The host may have cancelled it (e.g. we were briefly out of
+		// reach); ask again while still holding E.
+		st := s.Statuses[target]
+		if target == 0 || st.Reviver == s.net.LocalID() || time.Since(s.lastRevive) < reviveRetryDelay {
+			return
+		}
+	}
+	s.lastRevive = time.Now()
+	if target == 0 {
+		s.sendToHost(newMsg(msgReviveStop).bytes(), true)
+	} else {
+		w := newMsg(msgReviveStart)
+		w.u32(uint32(target))
+		s.sendToHost(w.bytes(), true)
+	}
+	s.reviveTarget = target
+}
+
 func (s *Session) toWorld() {
 	s.Area, s.Epoch, s.Level, s.Layout = lobby.AreaWorld, worldEpoch, 0, nil
 	s.ExitOpen, s.Potions = false, nil
 	s.mobs = map[uint16]*mobTrack{}
+	s.Statuses = map[PeerID]Status{}
+	s.reviveTarget = 0
 }
 
 func (s *Session) clientHandle(data []byte) {
@@ -216,6 +264,10 @@ func (s *Session) clientHandle(data []byte) {
 		}
 		s.ExitOpen, s.Potions, s.Invite = false, nil, nil
 		s.mobs = map[uint16]*mobTrack{}
+		// Everyone starts a new area standing; the host sends who is down
+		// to players joining mid-level.
+		s.Statuses = map[PeerID]Status{}
+		s.reviveTarget = 0
 		s.events = append(s.events, Event{Kind: EventEnterArea, Spawn: m.Spawn})
 	case msgAreaState:
 		m := decodeAreaState(r)
@@ -263,6 +315,31 @@ func (s *Session) clientHandle(data []byte) {
 	case msgRunComplete:
 		s.toWorld()
 		s.events = append(s.events, Event{Kind: EventRunComplete})
+	case msgPlayerStatus:
+		id, state, reviver := PeerID(r.u32()), LifeState(r.u8()), PeerID(r.u32())
+		if r.err != nil || s.Area == lobby.AreaWorld {
+			return
+		}
+		old := s.Statuses[id]
+		st := Status{State: state, Since: old.Since, Reviver: reviver, ReviveStart: old.ReviveStart}
+		if state != old.State {
+			st.Since = time.Now()
+		}
+		if reviver != old.Reviver {
+			st.ReviveStart = time.Now()
+		}
+		if state == Alive {
+			delete(s.Statuses, id)
+		} else {
+			s.Statuses[id] = st
+		}
+	case msgRevived:
+		if a := r.f32(); r.err == nil {
+			s.events = append(s.events, Event{Kind: EventRevived, Amount: a})
+		}
+	case msgWipe:
+		s.toWorld()
+		s.events = append(s.events, Event{Kind: EventWipe})
 	}
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"time"
 
 	"spooknloot/pkg/boss"
@@ -87,12 +88,13 @@ func coopConfig() coop.Config {
 func localPlayerState() lobby.PlayerState {
 	x, y, dir, frame := player.Appearance()
 	return lobby.PlayerState{
-		X:      x,
-		Y:      y,
-		Dir:    uint8(dir),
-		Frame:  uint8(frame),
-		Area:   currentArea(),
-		Health: uint8(player.GetCurrentHealth() / player.GetMaxHealth() * 100),
+		X:     x,
+		Y:     y,
+		Dir:   uint8(dir),
+		Frame: uint8(frame),
+		Area:  currentArea(),
+		// Round up: 0 must mean "down", not "almost dead".
+		Health: uint8(math.Ceil(float64(player.GetCurrentHealth() / player.GetMaxHealth() * 100))),
 	}
 }
 
@@ -120,8 +122,10 @@ func updateGame() {
 
 	if player.IsPlayerDead() {
 		player.PlayerMoving()
-		if player.HasPlayerDeathAnimationFinished() {
-			session.LeaveRun()
+		session.SetReviving(0)
+		// In a dungeon run you stay down until a teammate revives you, you
+		// bleed out, or the whole group is down (the host decides).
+		if currentArea() == lobby.AreaWorld && player.HasPlayerDeathAnimationFinished() {
 			enterWorld()
 			player.ResetPlayer()
 		}
@@ -129,6 +133,7 @@ func updateGame() {
 	}
 
 	player.PlayerMoving()
+	updateReviving()
 
 	if m, ok := mobs.Closest(session.Mobs(), playerCenter()); ok {
 		c := m.Center()
@@ -153,7 +158,16 @@ func handleSessionEvents() {
 	for _, ev := range session.TakeEvents() {
 		switch ev.Kind {
 		case coop.EventEnterArea:
+			// Players who were down come back on the next level.
+			if player.IsPlayerDead() {
+				player.Revive(coop.RespawnHealth * player.GetMaxHealth())
+			}
 			enterArea(ev.Spawn)
+		case coop.EventRevived:
+			player.Revive(ev.Amount * player.GetMaxHealth())
+		case coop.EventWipe:
+			enterWorld()
+			player.ResetPlayer()
 		case coop.EventDamage:
 			if !player.IsPlayerDead() {
 				player.SetPlayerDamageState()

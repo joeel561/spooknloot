@@ -29,6 +29,12 @@ const (
 	msgDamage      // a mob hit you
 	msgHeal        // you picked up a potion
 	msgRunComplete // boss defeated
+
+	msgReviveStart  // client -> host: holding E next to a downed player
+	msgReviveStop   // client -> host: released E or walked away
+	msgPlayerStatus // host -> run members: someone is down, dead or up again
+	msgRevived      // host -> client: you were revived
+	msgWipe         // host -> run members: everybody is down, run over
 )
 
 // Epoch identifies one instance of an area (the world, or one dungeon

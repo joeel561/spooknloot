@@ -57,6 +57,8 @@ type run struct {
 	spawnCount int
 	area       *area
 	members    map[PeerID]bool
+	status     map[PeerID]*memberStatus
+	wipeTimer  int
 }
 
 type host struct {
@@ -143,6 +145,9 @@ func (h *host) update(inbox []Message) {
 	if h.run != nil {
 		h.updateArea(h.run.area)
 		h.updateRunProgress()
+	}
+	if h.run != nil {
+		h.updateRevives()
 	}
 	h.sendAreas()
 }
@@ -313,6 +318,13 @@ func (h *host) handle(from PeerID, data []byte) {
 		}
 		h.lastAttack[from] = h.frame
 		a.mobs.Damage(mobID, playerAttackDamage)
+	case msgReviveStart:
+		target := PeerID(r.u32())
+		if r.err == nil && h.players[target] != nil {
+			h.handleReviveStart(from, target)
+		}
+	case msgReviveStop:
+		h.handleReviveStop(from)
 	case msgDebugBoss:
 		if from != h.s.net.LocalID() {
 			return
@@ -326,7 +338,7 @@ func (h *host) handle(from PeerID, data []byte) {
 }
 
 func (h *host) startRun(initiator PeerID) {
-	h.run = &run{id: h.nextRunID, members: map[PeerID]bool{}}
+	h.run = &run{id: h.nextRunID, members: map[PeerID]bool{}, status: map[PeerID]*memberStatus{}}
 	h.nextRunID++
 	h.setupDungeon(1)
 	h.addMember(initiator)
@@ -343,11 +355,15 @@ func (h *host) startRun(initiator PeerID) {
 
 func (h *host) addMember(id PeerID) {
 	h.run.members[id] = true
+	h.run.status[id] = &memberStatus{graceUntil: h.frame + statusGrace}
 	h.sendEnterArea(id)
+	h.sendStatuses(id)
 }
 
 func (h *host) removeMember(id PeerID) {
 	delete(h.run.members, id)
+	delete(h.run.status, id)
+	h.handleReviveStop(id)
 	if len(h.run.members) == 0 {
 		h.endRun()
 	}
@@ -381,6 +397,9 @@ func (h *host) nextLevel() {
 	} else {
 		h.setupDungeon(h.run.level + 1)
 	}
+	// Everyone starts the new level standing; clients revive themselves on
+	// the area change if they were down.
+	h.resetStatuses()
 	for id := range h.run.members {
 		h.sendEnterArea(id)
 	}

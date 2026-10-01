@@ -263,6 +263,7 @@ func render() {
 		if inv := session.Invite; inv != nil && currentArea() == lobby.AreaWorld {
 			ui.DrawInvite(inv.From, inv.Until)
 		}
+		drawDownedBanner()
 	}
 
 	if bossWinOpen {
