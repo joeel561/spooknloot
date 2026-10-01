@@ -52,6 +52,8 @@ type Event struct {
 	Kind   EventKind
 	Amount float32
 	Spawn  sim.Vec2
+	// Quiet heals (healer aura) play no potion sound.
+	Quiet bool
 }
 
 // Invite is a pending "X entered the dungeon, press J to join".
@@ -310,8 +312,9 @@ func (s *Session) clientHandle(data []byte) {
 			s.events = append(s.events, Event{Kind: EventDamage, Amount: a})
 		}
 	case msgHeal:
-		if a := r.f32(); r.err == nil && a > 0 {
-			s.events = append(s.events, Event{Kind: EventHeal, Amount: a})
+		a, quiet := r.f32(), r.bool()
+		if r.err == nil && a > 0 {
+			s.events = append(s.events, Event{Kind: EventHeal, Amount: a, Quiet: quiet})
 		}
 	case msgRunComplete:
 		s.toWorld()

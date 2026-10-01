@@ -12,9 +12,10 @@ import (
 
 // hub is an in-memory network between a host and clients.
 type hub struct {
-	nets   map[PeerID]*fakeNet
-	states map[PeerID]lobby.PlayerState
-	names  map[PeerID]string
+	nets    map[PeerID]*fakeNet
+	states  map[PeerID]lobby.PlayerState
+	names   map[PeerID]string
+	classes map[PeerID]sim.Class
 }
 
 type fakeNet struct {
@@ -56,7 +57,8 @@ func (n *fakeNet) States() []lobby.PlayerState {
 	return out
 }
 
-func (n *fakeNet) Name(id PeerID) string { return n.h.names[id] }
+func (n *fakeNet) Name(id PeerID) string     { return n.h.names[id] }
+func (n *fakeNet) Class(id PeerID) sim.Class { return n.h.classes[id] }
 
 var testConfig = Config{
 	WorldMobSpawns:  []sim.Vec2{{X: 300, Y: 300}},
@@ -74,7 +76,7 @@ type game struct {
 
 // newGame creates a host (ID 1) and clients 2..players.
 func newGame(t *testing.T, players int) *game {
-	g := &game{t: t, hub: &hub{nets: map[PeerID]*fakeNet{}, states: map[PeerID]lobby.PlayerState{}, names: map[PeerID]string{}},
+	g := &game{t: t, hub: &hub{nets: map[PeerID]*fakeNet{}, states: map[PeerID]lobby.PlayerState{}, names: map[PeerID]string{}, classes: map[PeerID]sim.Class{}},
 		sessions: map[PeerID]*Session{}, events: map[PeerID][]Event{}}
 	for i := 1; i <= players; i++ {
 		id := PeerID(i)
@@ -256,14 +258,21 @@ func TestAttackOutOfRangeIsIgnored(t *testing.T) {
 	g.sessions[2].EnterDungeon()
 	g.step(6)
 	s := g.sessions[2]
-	m := s.Mobs()[0]
-	g.place(2, sim.Vec2{X: m.Center().X + 300, Y: m.Center().Y})
-	s.Attack(m.ID)
+	mob := g.hostState().run.area.mobs.Mobs[0]
+	id := mob.ID
+	c := mob.Center()
+	g.place(2, sim.Vec2{X: c.X + 300, Y: c.Y})
+	s.Attack(id)
 	g.step(6)
-	for _, after := range s.Mobs() {
-		if after.ID == m.ID && after.Health < 100 {
-			t.Fatal("mob took damage from a player 300px away")
-		}
+	if g.hostState().run.area.mobs.Mob(id).Health < mob.MaxHealth {
+		t.Fatal("mob took damage from a player 300px away")
+	}
+	// Control: the same attack from close by does hit.
+	g.place(2, g.hostState().run.area.mobs.Mob(id).Center())
+	s.Attack(id)
+	g.step(6)
+	if g.hostState().run.area.mobs.Mob(id).Health == mob.MaxHealth {
+		t.Fatal("attack from close by did not hit either")
 	}
 }
 

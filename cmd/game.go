@@ -38,7 +38,7 @@ func startSession() {
 	if gameLobby != nil {
 		session = coop.NewSession(coop.LobbyNet{L: gameLobby}, coopConfig(), gameLobby.Seed)
 	} else {
-		session = coop.NewSession(coop.LocalNet{}, coopConfig(), time.Now().UnixNano())
+		session = coop.NewSession(coop.LocalNet{PlayerClass: selectedClass}, coopConfig(), time.Now().UnixNano())
 	}
 }
 
@@ -110,6 +110,7 @@ func updateGame() {
 		session.Update()
 	}
 	handleSessionEvents()
+	updateBolts()
 
 	if menuOpen {
 		return
@@ -139,6 +140,9 @@ func updateGame() {
 		c := m.Center()
 		player.TryAttack(rl.NewVector2(c.X, c.Y), func(float32) {
 			session.Attack(m.ID)
+			if localClass() == sim.ClassMage {
+				fireBolt(rl.NewVector2(c.X, c.Y))
+			}
 		})
 	}
 
@@ -178,7 +182,9 @@ func handleSessionEvents() {
 			if heal := min(ev.Amount*player.GetMaxHealth(), missing); heal > 0 {
 				player.TakeDamage(-heal)
 			}
-			dungeon.PlayDrinkSound()
+			if !ev.Quiet {
+				dungeon.PlayDrinkSound()
+			}
 		case coop.EventExitOpened:
 			world.PlayDoorOpenSound()
 		case coop.EventRunComplete:

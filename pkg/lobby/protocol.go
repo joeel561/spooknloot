@@ -5,11 +5,12 @@ import (
 	"errors"
 
 	"spooknloot/pkg/netcode"
+	"spooknloot/pkg/sim"
 )
 
 // ProtocolVersion must match between host and clients. Bump it whenever a
 // message format changes.
-const ProtocolVersion = "4"
+const ProtocolVersion = "5"
 
 // MsgGameFirst is the first message type reserved for gameplay messages.
 // The lobby passes those through untouched (see Lobby.SendGame).
@@ -33,8 +34,9 @@ const (
 // JSON. Frequent gameplay messages will get a compact binary format.
 
 type helloMsg struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
+	Name    string    `json:"name"`
+	Version string    `json:"version"`
+	Class   sim.Class `json:"class"`
 }
 
 type welcomeMsg struct {

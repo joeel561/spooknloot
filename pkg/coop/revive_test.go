@@ -47,14 +47,14 @@ func TestDownedPlayerCanBeRevived(t *testing.T) {
 	}
 
 	g.sessions[1].SetReviving(2)
-	g.step(ReviveTime / 2)
+	g.step(sim.ClassWarrior.Stats().ReviveTime / 2)
 	if st := g.sessions[2].Statuses[2]; st.Reviver != 1 {
 		t.Fatalf("downed player does not see the reviver: %+v", st)
 	}
 	if len(g.takeEvents(2, EventRevived)) != 0 {
 		t.Fatal("revived too early")
 	}
-	g.step(ReviveTime/2 + 3)
+	g.step(sim.ClassWarrior.Stats().ReviveTime/2 + 3)
 	ev := g.takeEvents(2, EventRevived)
 	if len(ev) != 1 || ev[0].Amount != ReviveHealth {
 		t.Fatalf("revive events = %+v", ev)
@@ -75,7 +75,7 @@ func TestReviveStopsWhenWalkingAway(t *testing.T) {
 	g.sessions[1].SetReviving(2)
 	g.step(30)
 	g.place(1, sim.Vec2{X: 300, Y: 100})
-	g.step(ReviveTime)
+	g.step(sim.ClassWarrior.Stats().ReviveTime)
 	if len(g.takeEvents(2, EventRevived)) != 0 {
 		t.Fatal("revived from far away")
 	}

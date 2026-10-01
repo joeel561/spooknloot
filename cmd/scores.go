@@ -17,6 +17,7 @@ func scoreRows() []ui.ScoreRow {
 	if gameLobby == nil {
 		return []ui.ScoreRow{{
 			Name:      lobby.SanitizeName(nameInput.Text),
+			Class:     selectedClass,
 			Kills:     session.Kills(netcode.HostPeerID),
 			Ping:      "--",
 			PingColor: ui.MutedTextColor,
@@ -30,7 +31,7 @@ func scoreRows() []ui.ScoreRow {
 	}
 	rows := make([]ui.ScoreRow, 0, len(gameLobby.Players))
 	for _, p := range gameLobby.Players {
-		row := ui.ScoreRow{Name: p.Name, Kills: session.Kills(p.ID), Local: p.ID == gameLobby.LocalID}
+		row := ui.ScoreRow{Name: p.Name, Kills: session.Kills(p.ID), Local: p.ID == gameLobby.LocalID, Class: p.Class}
 		switch ms, ok := pings[p.ID]; {
 		case row.Local:
 			row.Ping, row.PingColor = ui.PingLabel(gameLobby)

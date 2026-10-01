@@ -49,6 +49,7 @@ var (
 	healthBarSrc     rl.Rectangle
 
 	attackRange       float32 = 40
+	playerTint                = rl.White
 	isAttacking       bool
 	attackDuration    int = 15
 	attackTimer       int
@@ -154,7 +155,7 @@ func InitPlayer() {
 }
 
 func DrawPlayerTexture() {
-	rl.DrawTexturePro(playerSprite, playerSrc, PlayerDest, rl.NewVector2(0, 0), 0, rl.White)
+	rl.DrawTexturePro(playerSprite, playerSrc, PlayerDest, rl.NewVector2(0, 0), 0, playerTint)
 }
 
 // Appearance returns what other players need to draw this player: the
@@ -773,4 +774,14 @@ func SetPosition(x, y float32) {
 	// Ensure camera follows player center consistently with Y offset
 	Cam.Offset = rl.NewVector2(float32(rl.GetScreenWidth()/2), float32(rl.GetScreenHeight()/2))
 	Cam.Target = rl.NewVector2(float32(PlayerDest.X+(PlayerDest.Width/2)), float32(PlayerDest.Y+(PlayerDest.Height/2)+camYOffset))
+}
+
+// SetClass applies the chosen class: max health, attack reach and the
+// sprite tint that tells classes apart.
+func SetClass(health, reach float32, tint rl.Color) {
+	maxHealth = health
+	currentHealth = min(currentHealth, maxHealth)
+	attackRange = reach
+	playerTint = tint
+	UpdateHealthBar()
 }

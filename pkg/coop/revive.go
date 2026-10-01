@@ -19,13 +19,13 @@ const (
 )
 
 const (
-	BleedOutTime  = 30 * 60 // frames
-	ReviveTime    = 3 * 60  // frames of holding E
-	ReviveReach   = 28      // pixels between player centers
-	reviveSlack   = 12      // network delay allowance on the host
-	ReviveHealth  = 0.3     // fraction of max health after a revive
-	RespawnHealth = 0.5     // fraction after bleeding out, on the next level
-	wipeDelay     = 90      // frames, lets the last death animation play
+	BleedOutTime = 30 * 60 // frames
+	// The time to revive someone depends on the reviver's class.
+	ReviveReach   = 28  // pixels between player centers
+	reviveSlack   = 12  // network delay allowance on the host
+	ReviveHealth  = 0.3 // fraction of max health after a revive
+	RespawnHealth = 0.5 // fraction after bleeding out, on the next level
+	wipeDelay     = 90  // frames, lets the last death animation play
 	// After a revive or level change the player's reported health is still
 	// 0 for a moment; ignore it for this many frames.
 	statusGrace = 60
@@ -116,7 +116,7 @@ func (h *host) advanceRevive(id PeerID, st *memberStatus) {
 		return
 	}
 	st.progress++
-	if st.progress < ReviveTime {
+	if st.progress < h.s.net.Class(st.reviver).Stats().ReviveTime {
 		return
 	}
 	*st = memberStatus{graceUntil: h.frame + statusGrace}

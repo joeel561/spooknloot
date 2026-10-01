@@ -197,3 +197,15 @@ func TestScaling(t *testing.T) {
 		t.Errorf("boss health for 2 players = %v, want 180", got)
 	}
 }
+
+func TestClassStats(t *testing.T) {
+	for _, c := range AllClasses {
+		s := c.Stats()
+		if s.Name == "" || s.MaxHealth <= 0 || s.Damage <= 0 || s.Range <= 0 || s.ReviveTime <= 0 {
+			t.Errorf("class %d has incomplete stats: %+v", c, s)
+		}
+	}
+	if Class(99).Stats().Name != ClassWarrior.Stats().Name || Class(99).Valid() {
+		t.Error("unknown class must fall back to warrior")
+	}
+}

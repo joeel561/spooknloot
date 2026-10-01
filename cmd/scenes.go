@@ -12,12 +12,12 @@ import (
 func drawMenuScreens() {
 	switch currentScene {
 	case sceneTitle:
-		switch ui.DrawTitle(&nameInput, statusMessage) {
+		switch ui.DrawTitle(&nameInput, &selectedClass, statusMessage) {
 		case ui.TitleSingleplayer:
 			statusMessage = ""
 			startGame()
 		case ui.TitleHost:
-			l, err := lobby.NewHost(nameInput.Text, netcode.DefaultGamePort)
+			l, err := lobby.NewHost(nameInput.Text, selectedClass, netcode.DefaultGamePort)
 			if err != nil {
 				statusMessage = err.Error()
 				return
@@ -47,7 +47,7 @@ func drawMenuScreens() {
 		case ui.JoinConnect:
 			statusMessage = ""
 			stopLANBrowser()
-			gameLobby = lobby.Join(addr, nameInput.Text)
+			gameLobby = lobby.Join(addr, nameInput.Text, selectedClass)
 			currentScene = sceneLobby
 		case ui.JoinBack:
 			statusMessage = ""
@@ -92,6 +92,7 @@ func updateLobby() {
 }
 
 func startGame() {
+	applyClass(localClass())
 	resetGameState()
 	startSession()
 	currentScene = scenePlaying

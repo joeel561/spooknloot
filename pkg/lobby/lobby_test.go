@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"spooknloot/pkg/netcode"
+	"spooknloot/pkg/sim"
 )
 
 const testPort = 47878
@@ -26,15 +27,15 @@ func waitFor(t *testing.T, what string, lobbies []*Lobby, cond func() bool) {
 }
 
 func TestLobbyFlow(t *testing.T) {
-	host, err := newHost("Nicole", "127.0.0.1", testPort, false)
+	host, err := newHost("Nicole", sim.ClassWarrior, "127.0.0.1", testPort, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer host.Leave()
 
 	addr := fmt.Sprintf("127.0.0.1:%d", testPort)
-	a := Join(addr, "Alice")
-	b := Join("127.0.0.1:"+fmt.Sprint(testPort), "Alice") // duplicate name
+	a := Join(addr, "Alice", sim.ClassWarrior)
+	b := Join("127.0.0.1:"+fmt.Sprint(testPort), "Alice", sim.ClassWarrior) // duplicate name
 	all := []*Lobby{host, a, b}
 
 	waitFor(t, "both clients in lobby", all, func() bool {
@@ -67,7 +68,7 @@ func TestLobbyFlow(t *testing.T) {
 	}
 
 	// A late joiner goes straight into the running game.
-	c := Join(addr, "Late")
+	c := Join(addr, "Late", sim.ClassWarrior)
 	all = append(all, c)
 	waitFor(t, "late joiner in game", all, func() bool { return c.State == StateInGame })
 
@@ -86,7 +87,7 @@ func TestLobbyFlow(t *testing.T) {
 }
 
 func TestVersionMismatchRejected(t *testing.T) {
-	host, err := newHost("Host", "127.0.0.1", testPort+1, false)
+	host, err := newHost("Host", sim.ClassWarrior, "127.0.0.1", testPort+1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +120,7 @@ func TestVersionMismatchRejected(t *testing.T) {
 }
 
 func TestJoinUnreachable(t *testing.T) {
-	l := Join("127.0.0.1:1", "Nobody")
+	l := Join("127.0.0.1:1", "Nobody", sim.ClassWarrior)
 	deadline := time.Now().Add(10 * time.Second)
 	for l.State != StateClosed && time.Now().Before(deadline) {
 		l.Update()
@@ -127,5 +128,27 @@ func TestJoinUnreachable(t *testing.T) {
 	}
 	if l.State != StateClosed || l.Err == nil {
 		t.Fatalf("state = %v err = %v, want closed with error", l.State, l.Err)
+	}
+}
+
+func TestClassIsShared(t *testing.T) {
+	host, err := newHost("Host", sim.ClassHealer, "127.0.0.1", testPort+4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Leave()
+	addr := fmt.Sprintf("127.0.0.1:%d", testPort+4)
+	m := Join(addr, "M", sim.ClassMage)
+	bad := Join(addr, "X", sim.Class(200))
+	defer m.Leave()
+	defer bad.Leave()
+	all := []*Lobby{host, m, bad}
+	waitFor(t, "lobby", all, func() bool { return len(m.Players) == 3 && len(bad.Players) == 3 })
+	classes := map[string]sim.Class{}
+	for _, p := range m.Players {
+		classes[p.Name] = p.Class
+	}
+	if classes["Host"] != sim.ClassHealer || classes["M"] != sim.ClassMage || classes["X"] != sim.ClassWarrior {
+		t.Errorf("classes = %v, want Host healer, M mage, X warrior (invalid class)", classes)
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"spooknloot/pkg/sim"
 )
 
 func TestStatesRoundTrip(t *testing.T) {
@@ -61,14 +63,14 @@ func TestInterpolation(t *testing.T) {
 }
 
 func TestPlayerStateRelay(t *testing.T) {
-	host, err := newHost("Host", "127.0.0.1", testPort+2, false)
+	host, err := newHost("Host", sim.ClassWarrior, "127.0.0.1", testPort+2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer host.Leave()
 	addr := fmt.Sprintf("127.0.0.1:%d", testPort+2)
-	a := Join(addr, "A")
-	b := Join(addr, "B")
+	a := Join(addr, "A", sim.ClassWarrior)
+	b := Join(addr, "B", sim.ClassWarrior)
 	all := []*Lobby{host, a, b}
 	waitFor(t, "lobby", all, func() bool { return len(a.Players) == 3 && len(b.Players) == 3 })
 	a.SetReady(true)
@@ -107,12 +109,12 @@ func TestPlayerStateRelay(t *testing.T) {
 }
 
 func TestPingIsMeasuredAndShared(t *testing.T) {
-	host, err := newHost("Host", "127.0.0.1", testPort+3, false)
+	host, err := newHost("Host", sim.ClassWarrior, "127.0.0.1", testPort+3, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer host.Leave()
-	c := Join(fmt.Sprintf("127.0.0.1:%d", testPort+3), "C")
+	c := Join(fmt.Sprintf("127.0.0.1:%d", testPort+3), "C", sim.ClassWarrior)
 	defer c.Leave()
 	all := []*Lobby{host, c}
 	waitFor(t, "lobby", all, func() bool { return c.State == StateInLobby })

@@ -8,6 +8,7 @@ import (
 	"spooknloot/pkg/lobby"
 	"spooknloot/pkg/netcode"
 	"spooknloot/pkg/player"
+	"spooknloot/pkg/ui"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -36,7 +37,7 @@ func collectVisibleRemotes() {
 // drawRemotePlayers draws the other characters in world space.
 func drawRemotePlayers() {
 	for _, s := range visibleRemotes {
-		tint := rl.White
+		tint := ui.ClassColor(classOf(s.ID))
 		switch {
 		case session.Statuses[s.ID].State == coop.BledOut:
 			tint = rl.DarkGray
@@ -90,7 +91,7 @@ func drawRemoteNames() {
 		w := rl.MeasureText(name, size)
 		x, y := int32(head.X)-w/2, int32(head.Y)-size-4
 		rl.DrawRectangle(x-4, y-2, w+8, size+4, rl.NewColor(0, 0, 0, 140))
-		rl.DrawText(name, x, y, size, rl.RayWhite)
+		rl.DrawText(name, x, y, size, ui.ClassColor(classOf(s.ID)))
 
 		st := session.Statuses[s.ID]
 		below := int32(head.Y) + 70
@@ -98,7 +99,8 @@ func drawRemoteNames() {
 		case st.State == coop.BledOut:
 			drawTag("bled out", int32(head.X), below, rl.LightGray)
 		case st.State == coop.Downed && st.Reviver != 0:
-			progress := float32(time.Since(st.ReviveStart).Seconds()) / (coop.ReviveTime / 60.0)
+			reviveSecs := float32(classOf(st.Reviver).Stats().ReviveTime) / 60
+			progress := float32(time.Since(st.ReviveStart).Seconds()) / reviveSecs
 			drawProgressBar(int32(head.X), below, min(progress, 1))
 		case st.State == coop.Downed && s.ID == candidate:
 			drawTag("Hold E to revive", int32(head.X), below, rl.NewColor(231, 152, 50, 255))

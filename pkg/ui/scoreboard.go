@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 
+	"spooknloot/pkg/sim"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -13,6 +15,7 @@ type ScoreRow struct {
 	Ping      string
 	PingColor rl.Color
 	Local     bool
+	Class     sim.Class
 }
 
 const liveRankingSize = 5
@@ -62,7 +65,7 @@ func DrawLiveRanking(rows []ScoreRow) {
 
 // DrawScoreboard shows every player with kills and ping (held Tab).
 func DrawScoreboard(rows []ScoreRow) {
-	const rowsPerCol, rowH, colW = 20, 26, float32(400)
+	const rowsPerCol, rowH, colW = 20, 26, float32(460)
 	cols := 1
 	if len(rows) > rowsPerCol {
 		cols = 2
@@ -79,6 +82,7 @@ func DrawScoreboard(rows []ScoreRow) {
 		x := panel.X + 20 + float32(c)*(colW+20)
 		y := panel.Y + 66
 		rl.DrawText("Player", int32(x)+8, int32(y), 16, mutedTextColor)
+		rl.DrawText("Class", int32(x+colW)-240, int32(y), 16, mutedTextColor)
 		rl.DrawText("Kills", int32(x+colW)-150, int32(y), 16, mutedTextColor)
 		rl.DrawText("Ping", int32(x+colW)-70, int32(y), 16, mutedTextColor)
 	}
@@ -90,6 +94,7 @@ func DrawScoreboard(rows []ScoreRow) {
 			rl.DrawRectangle(int32(x), int32(y)-3, int32(colW), rowH, rl.NewColor(74, 48, 66, 200))
 		}
 		rl.DrawText(fmt.Sprintf("%d. %s", i+1, r.Name), int32(x)+8, int32(y), 20, rl.RayWhite)
+		rl.DrawText(r.Class.Stats().Name, int32(x+colW)-240, int32(y)+2, 18, ClassColor(r.Class))
 		rl.DrawText(fmt.Sprint(r.Kills), int32(x+colW)-150, int32(y), 20, rl.RayWhite)
 		rl.DrawText(r.Ping, int32(x+colW)-70, int32(y), 20, r.PingColor)
 	}

@@ -7,6 +7,7 @@ import (
 
 	"spooknloot/pkg/lobby"
 	"spooknloot/pkg/netcode"
+	"spooknloot/pkg/sim"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -31,10 +32,10 @@ func dimBackground() {
 
 // DrawTitle draws the start screen. status is shown below the buttons
 // (e.g. why the last lobby was closed).
-func DrawTitle(name *TextInput, status string) TitleAction {
+func DrawTitle(name *TextInput, class *sim.Class, status string) TitleAction {
 	dimBackground()
 	cx, cy := screenCenter()
-	panel := rl.NewRectangle(cx-260, cy-250, 520, 500)
+	panel := rl.NewRectangle(cx-260, cy-305, 520, 610)
 	drawPanel(panel)
 
 	drawLabelCentered("SPOOK 'N LOOT", cx, panel.Y+30, 56, rl.RayWhite)
@@ -42,10 +43,20 @@ func DrawTitle(name *TextInput, status string) TitleAction {
 	drawLabel("Your name", panel.X+60, panel.Y+115, 22, mutedTextColor)
 	name.Draw(rl.NewRectangle(panel.X+60, panel.Y+145, 400, 44))
 
+	drawLabel("Class", panel.X+60, panel.Y+205, 22, mutedTextColor)
+	cw, gap := float32(128), float32(8)
+	for i, c := range sim.AllClasses {
+		r := rl.NewRectangle(panel.X+60+float32(i)*(cw+gap), panel.Y+235, cw, 44)
+		if classButton(r, c, *class == c) {
+			*class = c
+		}
+	}
+	drawLabelCentered(class.Stats().Description, cx, panel.Y+290, 18, ClassColor(*class))
+
 	action := TitleNone
 	bw, bh := float32(400), float32(48)
 	bx := cx - bw/2
-	y := panel.Y + 215
+	y := panel.Y + 325
 	if button(rl.NewRectangle(bx, y, bw, bh), "Singleplayer", true) {
 		action = TitleSingleplayer
 	}
@@ -66,6 +77,28 @@ func DrawTitle(name *TextInput, status string) TitleAction {
 		drawStatus(status, cx, panel.Y+panel.Height+16)
 	}
 	return action
+}
+
+// classButton is a toggle button for one class; the selected one is
+// highlighted in the class color.
+func classButton(r rl.Rectangle, c sim.Class, selected bool) bool {
+	clicked := button(r, c.Stats().Name, true)
+	if selected {
+		rl.DrawRectangleLinesEx(r, 3, ClassColor(c))
+	}
+	return clicked
+}
+
+// ClassColor is the tint that tells classes apart in the game and menus.
+func ClassColor(c sim.Class) rl.Color {
+	switch c {
+	case sim.ClassMage:
+		return rl.NewColor(150, 180, 255, 255)
+	case sim.ClassHealer:
+		return rl.NewColor(160, 255, 170, 255)
+	default:
+		return rl.NewColor(255, 170, 160, 255)
+	}
 }
 
 func drawStatus(status string, cx, y float32) {
@@ -199,6 +232,8 @@ func DrawLobby(l *lobby.Lobby) LobbyAction {
 			rl.DrawRectangle(int32(x)-6, int32(y)-2, int32(colW)+12, int32(rowH), rl.NewColor(74, 48, 66, 180))
 		}
 		rl.DrawText(p.Name, int32(x), int32(y)+2, 20, rl.RayWhite)
+		nw := rl.MeasureText(p.Name, 20)
+		rl.DrawText(p.Class.Stats().Name, int32(x)+nw+10, int32(y)+5, 16, ClassColor(p.Class))
 		tag, color := "not ready", mutedTextColor
 		switch {
 		case p.Host:

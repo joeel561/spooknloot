@@ -26,9 +26,8 @@ const (
 	potionHeal         = 0.6
 	exitOpenDelay      = 6
 	snapshotEvery      = 3 // frames, 20 Hz at 60 FPS
-	playerAttackDamage = 2.5
-	// Player attack range is 40; the slack covers network delay.
-	playerAttackReach    = 40 + 24
+	// Extra attack reach on top of the class range for network delay.
+	attackReachSlack     = 24
 	playerAttackCooldown = 10
 	exitReach            = 32
 )
@@ -150,6 +149,7 @@ func (h *host) update(inbox []Message) {
 	if h.run != nil {
 		h.updateRevives()
 	}
+	h.updateAura()
 	h.sendAreas()
 	h.sendScores()
 }
@@ -213,9 +213,7 @@ func (h *host) updateArea(a *area) {
 			if hb.Overlaps(sim.Rect{X: a.potions[i].X, Y: a.potions[i].Y, W: sim.TileSize, H: sim.TileSize}) {
 				a.potions = append(a.potions[:i], a.potions[i+1:]...)
 				a.dirty = true
-				w := newMsg(msgHeal)
-				w.f32(potionHeal)
-				h.s.hostSend(PeerID(t.ID), w.bytes(), true)
+				h.s.hostSend(PeerID(t.ID), encodeHeal(potionHeal, false), true)
 				break
 			}
 		}
@@ -316,11 +314,12 @@ func (h *host) handle(from PeerID, data []byte) {
 		}
 		a := h.areaOf(from)
 		m := a.mobs.Mob(mobID)
-		if a.epoch != epoch || m == nil || sim.Dist(playerCenter(h.players[from]), m.Center()) > playerAttackReach+m.HitSize/2 {
+		class := h.s.net.Class(from).Stats()
+		if a.epoch != epoch || m == nil || sim.Dist(playerCenter(h.players[from]), m.Center()) > class.Range+attackReachSlack+m.HitSize/2 {
 			return
 		}
 		h.lastAttack[from] = h.frame
-		if a.mobs.Damage(mobID, playerAttackDamage) && m.Dying {
+		if a.mobs.Damage(mobID, class.Damage) && m.Dying {
 			h.creditKill(from)
 		}
 	case msgReviveStart:

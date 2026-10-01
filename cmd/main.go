@@ -83,6 +83,7 @@ func drawScene() {
 
 	drawRemotePlayers()
 	player.DrawPlayerTexture()
+	drawBolts()
 
 	if currentArea() == lobby.AreaWorld {
 		world.DrawWheat()

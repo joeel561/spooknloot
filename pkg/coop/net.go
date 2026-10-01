@@ -6,6 +6,7 @@ package coop
 import (
 	"spooknloot/pkg/lobby"
 	"spooknloot/pkg/netcode"
+	"spooknloot/pkg/sim"
 )
 
 type PeerID = netcode.PeerID
@@ -28,6 +29,7 @@ type Net interface {
 	// States returns the latest state of every remote player (host only).
 	States() []lobby.PlayerState
 	Name(id PeerID) string
+	Class(id PeerID) sim.Class
 }
 
 // LobbyNet adapts a lobby to Net.
@@ -59,8 +61,18 @@ func (n LobbyNet) Players() []PeerID {
 func (n LobbyNet) States() []lobby.PlayerState { return n.L.LatestStates() }
 func (n LobbyNet) Name(id PeerID) string       { return n.L.PlayerName(id) }
 
-// LocalNet is the network of a singleplayer game: just the local host.
-type LocalNet struct{}
+func (n LobbyNet) Class(id PeerID) sim.Class {
+	for _, p := range n.L.Players {
+		if p.ID == id {
+			return p.Class
+		}
+	}
+	return sim.ClassWarrior
+}
+
+// LocalNet is the network of a singleplayer game: just the local host
+// playing the given class.
+type LocalNet struct{ PlayerClass sim.Class }
 
 func (LocalNet) LocalID() PeerID             { return netcode.HostPeerID }
 func (LocalNet) IsHost() bool                { return true }
@@ -69,3 +81,4 @@ func (LocalNet) Receive() []Message          { return nil }
 func (LocalNet) Players() []PeerID           { return []PeerID{netcode.HostPeerID} }
 func (LocalNet) States() []lobby.PlayerState { return nil }
 func (LocalNet) Name(PeerID) string          { return "You" }
+func (n LocalNet) Class(PeerID) sim.Class    { return n.PlayerClass }

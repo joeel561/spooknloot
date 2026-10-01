@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"spooknloot/pkg/netcode"
+	"spooknloot/pkg/sim"
 )
 
 const (
@@ -35,6 +36,7 @@ type Player struct {
 	Name  string         `json:"name"`
 	Ready bool           `json:"ready"`
 	Host  bool           `json:"host"`
+	Class sim.Class      `json:"class"`
 }
 
 type Lobby struct {
@@ -63,17 +65,17 @@ type dialResult struct {
 }
 
 // NewHost opens a lobby on the given port and announces it on the LAN.
-func NewHost(playerName string, port int) (*Lobby, error) {
-	return newHost(playerName, "", port, true)
+func NewHost(playerName string, class sim.Class, port int) (*Lobby, error) {
+	return newHost(playerName, class, "", port, true)
 }
 
 // NewHostOn binds to listenIP only ("" for all interfaces). Local tests use
 // 127.0.0.1 without LAN announcements so Windows Firewall does not prompt.
-func NewHostOn(playerName, listenIP string, port int, announce bool) (*Lobby, error) {
-	return newHost(playerName, listenIP, port, announce)
+func NewHostOn(playerName string, class sim.Class, listenIP string, port int, announce bool) (*Lobby, error) {
+	return newHost(playerName, class, listenIP, port, announce)
 }
 
-func newHost(playerName, listenIP string, port int, announce bool) (*Lobby, error) {
+func newHost(playerName string, class sim.Class, listenIP string, port int, announce bool) (*Lobby, error) {
 	h, err := netcode.Host(net.JoinHostPort(listenIP, fmt.Sprint(port)))
 	if err != nil {
 		return nil, fmt.Errorf("could not open port %d: %w", port, err)
@@ -83,7 +85,7 @@ func newHost(playerName, listenIP string, port int, announce bool) (*Lobby, erro
 		IsHost:    true,
 		LobbyName: name + "'s game",
 		LocalID:   netcode.HostPeerID,
-		Players:   []Player{{ID: netcode.HostPeerID, Name: name, Ready: true, Host: true}},
+		Players:   []Player{{ID: netcode.HostPeerID, Name: name, Ready: true, Host: true, Class: class}},
 		State:     StateInLobby,
 		transport: h,
 	}
@@ -105,10 +107,10 @@ func newHost(playerName, listenIP string, port int, announce bool) (*Lobby, erro
 }
 
 // Join connects to a host in the background. addr may omit the port.
-func Join(addr, playerName string) *Lobby {
+func Join(addr, playerName string, class sim.Class) *Lobby {
 	l := &Lobby{State: StateConnecting, dialDone: make(chan dialResult, 1)}
 	addr = withDefaultPort(strings.TrimSpace(addr))
-	hello := encode(msgHello, helloMsg{Name: SanitizeName(playerName), Version: ProtocolVersion})
+	hello := encode(msgHello, helloMsg{Name: SanitizeName(playerName), Version: ProtocolVersion, Class: class})
 	go func() {
 		c, err := netcode.Dial(addr, hello, dialTimeout)
 		l.dialDone <- dialResult{c, err}
@@ -225,7 +227,11 @@ func (l *Lobby) hostAddPlayer(peer netcode.PeerID, m helloMsg) {
 		l.transport.Disconnect(peer, "lobby is full")
 		return
 	}
-	l.Players = append(l.Players, Player{ID: peer, Name: l.uniqueName(SanitizeName(m.Name))})
+	class := m.Class
+	if !class.Valid() {
+		class = sim.ClassWarrior
+	}
+	l.Players = append(l.Players, Player{ID: peer, Name: l.uniqueName(SanitizeName(m.Name)), Class: class})
 	_ = l.transport.Send(peer, encode(msgWelcome, welcomeMsg{YourID: peer}), true)
 	l.broadcastState()
 	// Late joiners go straight into the running game.
